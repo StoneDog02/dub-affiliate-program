@@ -1,0 +1,325 @@
+{% comment %}
+  BodyiQ Affiliate Portal
+  Assign this template to the "affiliate-portal" page in Shopify Admin.
+
+  Set the affiliate_api_base theme setting to your deployed Next.js API URL
+  (e.g. https://affiliate-api.bodyiq.com).
+{% endcomment %}
+
+{% layout none %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Affiliate Portal | BodyiQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --text: #111111;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #111111;
+      --success: #059669;
+      --error: #dc2626;
+      --radius: 16px;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 48px;
+    }
+
+    .logo {
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .hero p {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 999px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .btn:hover { opacity: 0.88; }
+
+    .section-title {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 48px 0 16px;
+    }
+
+    .cards {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      transition: opacity 0.2s ease;
+    }
+
+    .card.inactive {
+      opacity: 0.55;
+    }
+
+    .code {
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+      word-break: break-all;
+    }
+
+    .sublabel {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .toggle-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #d1d5db;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .slider::before {
+      content: "";
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    .switch input:checked + .slider {
+      background: var(--accent);
+    }
+
+    .switch input:checked + .slider::before {
+      transform: translateX(20px);
+    }
+
+    .status {
+      min-height: 1.25rem;
+      font-size: 0.8125rem;
+      margin-top: 8px;
+    }
+
+    .status.success { color: var(--success); }
+    .status.error { color: var(--error); }
+
+    .loading {
+      text-align: center;
+      color: var(--muted);
+      padding: 80px 0;
+    }
+
+    @media (max-width: 480px) {
+      .wrap { padding: 32px 16px 64px; }
+      .hero h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="loading">Loading your portal…</div>
+  </div>
+
+  <script>
+    (function () {
+      {% assign affiliate_api_base = settings.affiliate_api_base | default: "https://YOUR-API-DOMAIN.com" %}
+      var API_BASE = {{ affiliate_api_base | json }};
+
+      var params = new URLSearchParams(window.location.search);
+      var token = params.get("token");
+
+      if (!token) {
+        window.location.replace("/");
+        return;
+      }
+
+      var app = document.getElementById("app");
+
+      function redirectHome() {
+        window.location.replace("/");
+      }
+
+      function firstName(fullName) {
+        return (fullName || "").trim().split(/\s+/)[0] || "there";
+      }
+
+      function render(data) {
+        var cardsHtml = data.tiers.map(function (tier, index) {
+          return (
+            '<article class="card' + (tier.active ? "" : " inactive") + '" data-index="' + index + '">' +
+              '<div class="code">' + tier.code + '</div>' +
+              '<div class="sublabel">Gives customers ' + tier.discount + '% off · you earn ' + tier.commission + '% commission</div>' +
+              '<div class="toggle-row">' +
+                '<span class="toggle-label">' + (tier.active ? "Active" : "Inactive") + '</span>' +
+                '<label class="switch">' +
+                  '<input type="checkbox" ' + (tier.active ? "checked" : "") + ' data-code="' + tier.code + '" aria-label="Toggle ' + tier.code + '">' +
+                  '<span class="slider"></span>' +
+                '</label>' +
+              '</div>' +
+              '<div class="status" data-status></div>' +
+            '</article>'
+          );
+        }).join("");
+
+        app.innerHTML =
+          '<header class="header"><div class="logo">BodyiQ</div></header>' +
+          '<section class="hero">' +
+            '<h1>Welcome back, ' + firstName(data.name) + '</h1>' +
+            '<p>Manage your discount codes and track performance in your partner dashboard.</p>' +
+            '<a class="btn" href="' + data.dub_portal_url + '" target="_blank" rel="noopener">View my dashboard →</a>' +
+          '</section>' +
+          '<h2 class="section-title">Your discount codes</h2>' +
+          '<div class="cards">' + cardsHtml + '</div>';
+
+        app.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
+          input.addEventListener("change", function (event) {
+            toggleCode(event.target, data);
+          });
+        });
+      }
+
+      function setStatus(card, message, type) {
+        var el = card.querySelector("[data-status]");
+        el.textContent = message;
+        el.className = "status" + (type ? " " + type : "");
+        if (message) {
+          setTimeout(function () {
+            el.textContent = "";
+            el.className = "status";
+          }, 2500);
+        }
+      }
+
+      function toggleCode(input, data) {
+        var code = input.getAttribute("data-code");
+        var active = input.checked;
+        var card = input.closest(".card");
+        var label = card.querySelector(".toggle-label");
+        var previous = !active;
+
+        card.classList.toggle("inactive", !active);
+        label.textContent = active ? "Active" : "Inactive";
+
+        fetch(API_BASE + "/api/affiliate/toggle-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token, code: code, active: active }),
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error("Request failed");
+            return res.json();
+          })
+          .then(function () {
+            setStatus(card, active ? "Code activated" : "Code deactivated", "success");
+          })
+          .catch(function () {
+            input.checked = previous;
+            card.classList.toggle("inactive", !previous);
+            label.textContent = previous ? "Active" : "Inactive";
+            setStatus(card, "Could not update code", "error");
+          });
+      }
+
+      fetch(API_BASE + "/api/affiliate/me?token=" + encodeURIComponent(token))
+        .then(function (res) {
+          if (!res.ok) throw new Error("Unauthorized");
+          return res.json();
+        })
+        .then(render)
+        .catch(redirectHome);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "Affiliate Portal",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Affiliate portal API"
+    },
+    {
+      "type": "text",
+      "id": "affiliate_api_base",
+      "label": "Affiliate API base URL",
+      "default": "https://your-api-domain.com",
+      "info": "Deployed Next.js API URL (no trailing slash). Used by the affiliate portal page."
+    }
+  ]
+}
