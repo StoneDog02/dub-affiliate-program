@@ -1,6 +1,7 @@
 import {
   metadataIncludesCode,
   parseMetadataFromDescription,
+  reconstructMetadataFromLinks,
   serializeMetadata,
 } from "@/lib/affiliate/metadata";
 import type { AffiliateMetadata, TierKey } from "@/lib/affiliate/types";
@@ -33,6 +34,21 @@ export function getPartnerMetadata(partner: DubPartner): AffiliateMetadata | nul
   return parseMetadataFromDescription(partner.description);
 }
 
+export function resolvePartnerMetadata(partner: DubPartner): AffiliateMetadata | null {
+  const parsed = getPartnerMetadata(partner);
+  if (parsed) return parsed;
+
+  if (partner.tenantId) {
+    return reconstructMetadataFromLinks(partner.tenantId, partner.links);
+  }
+
+  return null;
+}
+
+export function isPartnerProvisioned(partner: DubPartner): boolean {
+  return resolvePartnerMetadata(partner) !== null;
+}
+
 export async function findPartnerByToken(
   token: string,
 ): Promise<(DubPartner & { metadata: AffiliateMetadata }) | null> {
@@ -41,7 +57,7 @@ export async function findPartnerByToken(
   // Fast path: tenantId is set to the portal token during onboarding.
   const byTenant = (await dub.partners.list({ tenantId: token })) as DubPartner[];
   for (const partner of byTenant) {
-    const metadata = getPartnerMetadata(partner);
+    const metadata = resolvePartnerMetadata(partner);
     if (metadata?.token === token) {
       return { ...partner, metadata };
     }
@@ -49,7 +65,7 @@ export async function findPartnerByToken(
 
   // Fallback: scan partner metadata (handles legacy records).
   for (const partner of await listAllPartners()) {
-    const metadata = getPartnerMetadata(partner);
+    const metadata = resolvePartnerMetadata(partner);
     if (metadata?.token === token) {
       return { ...partner, metadata };
     }
@@ -62,7 +78,7 @@ export async function findPartnerByCode(
   code: string,
 ): Promise<(DubPartner & { metadata: AffiliateMetadata }) | null> {
   for (const partner of await listAllPartners()) {
-    const metadata = getPartnerMetadata(partner);
+    const metadata = resolvePartnerMetadata(partner);
     if (metadata && metadataIncludesCode(metadata, code)) {
       return { ...partner, metadata };
     }

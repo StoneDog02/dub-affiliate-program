@@ -36,22 +36,38 @@ export function verifyShopifyWebhook(
   }
 }
 
-const PORTAL_ORIGIN = process.env.NEXT_PUBLIC_PORTAL_BASE_URL ?? "https://bodyiq.com";
+const PORTAL_ORIGINS = new Set([
+  process.env.NEXT_PUBLIC_PORTAL_BASE_URL ?? "https://bodyiq.com",
+  "https://bodyiq.com",
+  "https://www.bodyiq.com",
+]);
 
-export function corsHeaders(): HeadersInit {
+function portalOrigin(request?: Request): string {
+  const origin = request?.headers.get("Origin");
+  if (origin && PORTAL_ORIGINS.has(origin)) {
+    return origin;
+  }
+  return process.env.NEXT_PUBLIC_PORTAL_BASE_URL ?? "https://bodyiq.com";
+}
+
+export function corsHeaders(request?: Request): HeadersInit {
   return {
-    "Access-Control-Allow-Origin": PORTAL_ORIGIN,
+    "Access-Control-Allow-Origin": portalOrigin(request),
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 }
 
-export function jsonWithCors(body: unknown, status = 200): NextResponse {
-  return NextResponse.json(body, { status, headers: corsHeaders() });
+export function jsonWithCors(
+  body: unknown,
+  status = 200,
+  request?: Request,
+): NextResponse {
+  return NextResponse.json(body, { status, headers: corsHeaders(request) });
 }
 
-export function optionsResponse(): NextResponse {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+export function optionsResponse(request?: Request): NextResponse {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(request) });
 }
 
 export function extractFirstName(name: string): string {

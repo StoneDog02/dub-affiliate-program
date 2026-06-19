@@ -7,8 +7,8 @@ import { TIER_CONFIG } from "@/lib/affiliate/tiers";
 import type { AffiliateMeResponse } from "@/lib/affiliate/types";
 import { jsonWithCors, optionsResponse } from "@/lib/utils/http";
 
-export async function OPTIONS() {
-  return optionsResponse();
+export async function OPTIONS(req: NextRequest) {
+  return optionsResponse(req);
 }
 
 /**
@@ -21,12 +21,12 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
 
   if (!token) {
-    return jsonWithCors({ error: "Missing token" }, 401);
+    return jsonWithCors({ error: "Missing token" }, 401, req);
   }
 
   const partner = await findPartnerByToken(token);
   if (!partner) {
-    return jsonWithCors({ error: "Invalid token" }, 401);
+    return jsonWithCors({ error: "Invalid token" }, 401, req);
   }
 
   const { metadata } = partner;
@@ -53,5 +53,5 @@ export async function GET(req: NextRequest) {
     tiers,
   };
 
-  return jsonWithCors(response);
+  return jsonWithCors(response, 200, req);
 }

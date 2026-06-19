@@ -5,7 +5,7 @@ import type { AffiliateMetadata } from "@/lib/affiliate/types";
 import {
   createPartnerLink,
   getPartnerById,
-  getPartnerMetadata,
+  isPartnerProvisioned,
   updatePartnerMetadata,
 } from "@/lib/dub/partners";
 import { env } from "@/lib/env";
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
   try {
     const existing = await getPartnerById(partnerId);
-    if (existing && getPartnerMetadata(existing)) {
+    if (existing && isPartnerProvisioned(existing)) {
       return NextResponse.json({ ok: true, skipped: true, reason: "already_provisioned" });
     }
 

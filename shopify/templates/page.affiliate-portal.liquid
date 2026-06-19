@@ -214,7 +214,7 @@
 
   <script>
     (function () {
-      {% assign affiliate_api_base = settings.affiliate_api_base | default: "https://YOUR-API-DOMAIN.com" %}
+      {% assign affiliate_api_base = settings.affiliate_api_base | default: "https://dub-affiliate-program.vercel.app" %}
       var API_BASE = {{ affiliate_api_base | json }};
 
       var params = new URLSearchParams(window.location.search);

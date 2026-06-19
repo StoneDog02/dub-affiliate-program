@@ -11,8 +11,8 @@ const toggleSchema = z.object({
   active: z.boolean(),
 });
 
-export async function OPTIONS() {
-  return optionsResponse();
+export async function OPTIONS(req: NextRequest) {
+  return optionsResponse(req);
 }
 
 /**
@@ -26,33 +26,34 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return jsonWithCors({ error: "Invalid JSON body" }, 400);
+    return jsonWithCors({ error: "Invalid JSON body" }, 400, req);
   }
 
   const parsed = toggleSchema.safeParse(body);
   if (!parsed.success) {
-    return jsonWithCors({ error: "Invalid request body" }, 400);
+    return jsonWithCors({ error: "Invalid request body" }, 400, req);
   }
 
   const { token, code, active } = parsed.data;
 
   const partner = await findPartnerByToken(token);
   if (!partner) {
-    return jsonWithCors({ error: "Invalid token" }, 401);
+    return jsonWithCors({ error: "Invalid token" }, 401, req);
   }
 
   if (!metadataIncludesCode(partner.metadata, code)) {
-    return jsonWithCors({ error: "Code not found for this affiliate" }, 404);
+    return jsonWithCors({ error: "Code not found for this affiliate" }, 404, req);
   }
 
   try {
     await setDiscountActive(code, active);
-    return jsonWithCors({ success: true, code, active });
+    return jsonWithCors({ success: true, code, active }, 200, req);
   } catch (error) {
     console.error("[toggle-code]", error);
     return jsonWithCors(
       { error: error instanceof Error ? error.message : "Toggle failed" },
       500,
+      req,
     );
   }
 }
