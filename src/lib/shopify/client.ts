@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { getShopifyAccessToken } from "@/lib/shopify/auth";
 
 const API_VERSION = "2025-01";
 
@@ -18,7 +19,7 @@ async function shopifyGraphql<T>(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Shopify-Access-Token": env.shopifyAdminApiKey(),
+        "X-Shopify-Access-Token": await getShopifyAccessToken(),
       },
       body: JSON.stringify({ query, variables }),
     },

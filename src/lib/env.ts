@@ -7,7 +7,8 @@ function requireEnv(name: string): string {
 }
 
 export const env = {
-  shopifyAdminApiKey: () => requireEnv("SHOPIFY_ADMIN_API_KEY"),
+  shopifyClientId: () => requireEnv("SHOPIFY_CLIENT_ID"),
+  shopifyClientSecret: () => requireEnv("SHOPIFY_CLIENT_SECRET"),
   shopifyStoreDomain: () => requireEnv("SHOPIFY_STORE_DOMAIN"),
   shopifyWebhookSecret: () => requireEnv("SHOPIFY_WEBHOOK_SECRET"),
   dubApiKey: () => requireEnv("DUB_API_KEY"),

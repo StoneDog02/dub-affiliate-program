@@ -45,7 +45,8 @@ cp .env.example .env.local
 
 | Variable | Description |
 |---|---|
-| `SHOPIFY_ADMIN_API_KEY` | Shopify Admin API access token |
+| `SHOPIFY_CLIENT_ID` | Dev Dashboard app Client ID |
+| `SHOPIFY_CLIENT_SECRET` | Dev Dashboard app Secret (exchanged for access tokens) |
 | `SHOPIFY_STORE_DOMAIN` | e.g. `bodyiq.myshopify.com` |
 | `SHOPIFY_WEBHOOK_SECRET` | HMAC secret for order webhooks |
 | `DUB_API_KEY` | Dub workspace API key |
