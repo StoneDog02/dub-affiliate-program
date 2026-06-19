@@ -2,324 +2,337 @@
   BodyiQ Affiliate Portal
   Assign this template to the "affiliate-portal" page in Shopify Admin.
 
-  Set the affiliate_api_base theme setting to your deployed Next.js API URL
-  (e.g. https://affiliate-api.bodyiq.com).
+  Uses the store theme layout (header, footer, nav). Portal UI is scoped under
+  .affiliate-portal so it does not override global theme styles.
+
+  Optional theme setting affiliate_api_base → your deployed Next.js API URL.
 {% endcomment %}
 
-{% layout none %}
+<style>
+  .affiliate-portal {
+    --ap-bg: #fafafa;
+    --ap-surface: #ffffff;
+    --ap-text: #111111;
+    --ap-muted: #6b7280;
+    --ap-border: #e5e7eb;
+    --ap-accent: #111111;
+    --ap-success: #059669;
+    --ap-error: #dc2626;
+    --ap-radius: 16px;
+    --ap-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Affiliate Portal | BodyiQ</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #fafafa;
-      --surface: #ffffff;
-      --text: #111111;
-      --muted: #6b7280;
-      --border: #e5e7eb;
-      --accent: #111111;
-      --success: #059669;
-      --error: #dc2626;
-      --radius: 16px;
-      --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    color: var(--ap-text);
+    font-size: 1.0625rem;
+    line-height: 1.55;
+  }
+
+  .affiliate-portal__hero h1 {
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    font-weight: 600;
+    margin: 0 0 12px;
+  }
+
+  .affiliate-portal__hero p {
+    font-size: 1.125rem;
+    color: var(--ap-muted);
+    margin: 0 0 28px;
+  }
+
+  .affiliate-portal__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+    border-radius: 999px;
+    border: 1px solid var(--ap-accent);
+    background: var(--ap-accent);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  .affiliate-portal__btn:hover {
+    opacity: 0.88;
+    color: #fff;
+  }
+
+  .affiliate-portal__section-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ap-muted);
+    margin: 48px 0 20px;
+  }
+
+  .affiliate-portal__cards {
+    display: grid;
+    gap: 20px;
+  }
+
+  .affiliate-portal__card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto;
+    align-items: center;
+    gap: 10px 32px;
+    background: var(--ap-surface);
+    border: 1px solid var(--ap-border);
+    border-radius: var(--ap-radius);
+    padding: 32px 40px;
+    box-shadow: var(--ap-shadow);
+    transition: opacity 0.2s ease;
+  }
+
+  .affiliate-portal__card.is-inactive {
+    opacity: 0.55;
+  }
+
+  .affiliate-portal__code {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: clamp(1.375rem, 2.5vw, 1.75rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin: 0;
+    word-break: break-all;
+  }
+
+  .affiliate-portal__sublabel {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 1.0625rem;
+    color: var(--ap-muted);
+    margin: 0;
+  }
+
+  .affiliate-portal__toggle-row {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .affiliate-portal__toggle-label {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .affiliate-portal__switch {
+    position: relative;
+    width: 56px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  .affiliate-portal__switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .affiliate-portal__slider {
+    position: absolute;
+    inset: 0;
+    background: #d1d5db;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .affiliate-portal__slider::before {
+    content: "";
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+
+  .affiliate-portal__switch input:checked + .affiliate-portal__slider {
+    background: var(--ap-accent);
+  }
+
+  .affiliate-portal__switch input:checked + .affiliate-portal__slider::before {
+    transform: translateX(24px);
+  }
+
+  .affiliate-portal__status {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-height: 1.25rem;
+    font-size: 0.9375rem;
+    margin-top: 4px;
+  }
+
+  .affiliate-portal__status.is-success { color: var(--ap-success); }
+  .affiliate-portal__status.is-error { color: var(--ap-error); }
+
+  .affiliate-portal__loading {
+    text-align: center;
+    color: var(--ap-muted);
+    padding: 80px 0;
+  }
+
+  @media (max-width: 640px) {
+    .affiliate-portal {
+      padding: 32px 16px 64px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.5;
+    .affiliate-portal__hero h1 {
+      font-size: 1.5rem;
     }
 
-    .wrap {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 48px 24px 80px;
+    .affiliate-portal__hero p {
+      font-size: 1rem;
     }
 
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 48px;
-    }
-
-    .logo {
-      font-size: 1.125rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .hero h1 {
-      font-size: 1.75rem;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .hero p {
-      color: var(--muted);
-      margin-bottom: 24px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 20px;
-      border-radius: 999px;
-      border: 1px solid var(--accent);
-      background: var(--accent);
-      color: #fff;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      text-decoration: none;
-      cursor: pointer;
-      transition: opacity 0.15s ease;
-    }
-
-    .btn:hover { opacity: 0.88; }
-
-    .section-title {
-      font-size: 0.8125rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin: 48px 0 16px;
-    }
-
-    .cards {
-      display: grid;
-      gap: 16px;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+    .affiliate-portal__card {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto auto;
       padding: 24px;
-      box-shadow: var(--shadow);
-      transition: opacity 0.2s ease;
+      gap: 12px;
     }
 
-    .card.inactive {
-      opacity: 0.55;
+    .affiliate-portal__code,
+    .affiliate-portal__sublabel,
+    .affiliate-portal__toggle-row,
+    .affiliate-portal__status {
+      grid-column: 1;
+      grid-row: auto;
     }
 
-    .code {
-      font-size: 1.125rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      margin-bottom: 6px;
-      word-break: break-all;
-    }
-
-    .sublabel {
-      font-size: 0.875rem;
-      color: var(--muted);
-      margin-bottom: 20px;
-    }
-
-    .toggle-row {
-      display: flex;
+    .affiliate-portal__toggle-row {
+      flex-direction: row;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      width: 100%;
+    }
+  }
+</style>
+
+<div class="affiliate-portal" id="affiliate-portal-app">
+  <div class="affiliate-portal__loading">Loading your portal…</div>
+</div>
+
+<script>
+  (function () {
+    {% assign affiliate_api_base = settings.affiliate_api_base | default: "https://dub-affiliate-program.vercel.app" %}
+    var API_BASE = {{ affiliate_api_base | json }};
+
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get("token");
+
+    if (!token) {
+      window.location.replace("/");
+      return;
     }
 
-    .toggle-label {
-      font-size: 0.875rem;
-      font-weight: 500;
+    var app = document.getElementById("affiliate-portal-app");
+
+    function redirectHome() {
+      window.location.replace("/");
     }
 
-    .switch {
-      position: relative;
-      width: 48px;
-      height: 28px;
-      flex-shrink: 0;
+    function firstName(fullName) {
+      return (fullName || "").trim().split(/\s+/)[0] || "there";
     }
 
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
+    function render(data) {
+      var cardsHtml = data.tiers.map(function (tier, index) {
+        return (
+          '<article class="affiliate-portal__card' + (tier.active ? "" : " is-inactive") + '" data-index="' + index + '">' +
+            '<div class="affiliate-portal__code">' + tier.code + '</div>' +
+            '<div class="affiliate-portal__sublabel">Gives customers ' + tier.discount + '% off · you earn ' + tier.commission + '% commission</div>' +
+            '<div class="affiliate-portal__toggle-row">' +
+              '<span class="affiliate-portal__toggle-label">' + (tier.active ? "Active" : "Inactive") + '</span>' +
+              '<label class="affiliate-portal__switch">' +
+                '<input type="checkbox" ' + (tier.active ? "checked" : "") + ' data-code="' + tier.code + '" aria-label="Toggle ' + tier.code + '">' +
+                '<span class="affiliate-portal__slider"></span>' +
+              '</label>' +
+            '</div>' +
+            '<div class="affiliate-portal__status" data-status></div>' +
+          '</article>'
+        );
+      }).join("");
 
-    .slider {
-      position: absolute;
-      inset: 0;
-      background: #d1d5db;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
+      app.innerHTML =
+        '<section class="affiliate-portal__hero">' +
+          '<h1>Welcome back, ' + firstName(data.name) + '</h1>' +
+          '<p>Manage your discount codes and track performance in your partner dashboard.</p>' +
+          '<a class="affiliate-portal__btn" href="' + data.dub_portal_url + '" target="_blank" rel="noopener">View my dashboard →</a>' +
+        '</section>' +
+        '<h2 class="affiliate-portal__section-title">Your discount codes</h2>' +
+        '<div class="affiliate-portal__cards">' + cardsHtml + '</div>';
 
-    .slider::before {
-      content: "";
-      position: absolute;
-      width: 22px;
-      height: 22px;
-      left: 3px;
-      top: 3px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform 0.2s ease;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-    }
-
-    .switch input:checked + .slider {
-      background: var(--accent);
-    }
-
-    .switch input:checked + .slider::before {
-      transform: translateX(20px);
-    }
-
-    .status {
-      min-height: 1.25rem;
-      font-size: 0.8125rem;
-      margin-top: 8px;
-    }
-
-    .status.success { color: var(--success); }
-    .status.error { color: var(--error); }
-
-    .loading {
-      text-align: center;
-      color: var(--muted);
-      padding: 80px 0;
-    }
-
-    @media (max-width: 480px) {
-      .wrap { padding: 32px 16px 64px; }
-      .hero h1 { font-size: 1.5rem; }
-    }
-  </style>
-</head>
-<body>
-  <div class="wrap" id="app">
-    <div class="loading">Loading your portal…</div>
-  </div>
-
-  <script>
-    (function () {
-      {% assign affiliate_api_base = settings.affiliate_api_base | default: "https://dub-affiliate-program.vercel.app" %}
-      var API_BASE = {{ affiliate_api_base | json }};
-
-      var params = new URLSearchParams(window.location.search);
-      var token = params.get("token");
-
-      if (!token) {
-        window.location.replace("/");
-        return;
-      }
-
-      var app = document.getElementById("app");
-
-      function redirectHome() {
-        window.location.replace("/");
-      }
-
-      function firstName(fullName) {
-        return (fullName || "").trim().split(/\s+/)[0] || "there";
-      }
-
-      function render(data) {
-        var cardsHtml = data.tiers.map(function (tier, index) {
-          return (
-            '<article class="card' + (tier.active ? "" : " inactive") + '" data-index="' + index + '">' +
-              '<div class="code">' + tier.code + '</div>' +
-              '<div class="sublabel">Gives customers ' + tier.discount + '% off · you earn ' + tier.commission + '% commission</div>' +
-              '<div class="toggle-row">' +
-                '<span class="toggle-label">' + (tier.active ? "Active" : "Inactive") + '</span>' +
-                '<label class="switch">' +
-                  '<input type="checkbox" ' + (tier.active ? "checked" : "") + ' data-code="' + tier.code + '" aria-label="Toggle ' + tier.code + '">' +
-                  '<span class="slider"></span>' +
-                '</label>' +
-              '</div>' +
-              '<div class="status" data-status></div>' +
-            '</article>'
-          );
-        }).join("");
-
-        app.innerHTML =
-          '<header class="header"><div class="logo">BodyiQ</div></header>' +
-          '<section class="hero">' +
-            '<h1>Welcome back, ' + firstName(data.name) + '</h1>' +
-            '<p>Manage your discount codes and track performance in your partner dashboard.</p>' +
-            '<a class="btn" href="' + data.dub_portal_url + '" target="_blank" rel="noopener">View my dashboard →</a>' +
-          '</section>' +
-          '<h2 class="section-title">Your discount codes</h2>' +
-          '<div class="cards">' + cardsHtml + '</div>';
-
-        app.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
-          input.addEventListener("change", function (event) {
-            toggleCode(event.target, data);
-          });
+      app.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
+        input.addEventListener("change", function (event) {
+          toggleCode(event.target, data);
         });
+      });
+    }
+
+    function setStatus(card, message, type) {
+      var el = card.querySelector("[data-status]");
+      el.textContent = message;
+      el.className = "affiliate-portal__status" + (type ? " is-" + type : "");
+      if (message) {
+        setTimeout(function () {
+          el.textContent = "";
+          el.className = "affiliate-portal__status";
+        }, 2500);
       }
+    }
 
-      function setStatus(card, message, type) {
-        var el = card.querySelector("[data-status]");
-        el.textContent = message;
-        el.className = "status" + (type ? " " + type : "");
-        if (message) {
-          setTimeout(function () {
-            el.textContent = "";
-            el.className = "status";
-          }, 2500);
-        }
-      }
+    function toggleCode(input, data) {
+      var code = input.getAttribute("data-code");
+      var active = input.checked;
+      var card = input.closest(".affiliate-portal__card");
+      var label = card.querySelector(".affiliate-portal__toggle-label");
+      var previous = !active;
 
-      function toggleCode(input, data) {
-        var code = input.getAttribute("data-code");
-        var active = input.checked;
-        var card = input.closest(".card");
-        var label = card.querySelector(".toggle-label");
-        var previous = !active;
+      card.classList.toggle("is-inactive", !active);
+      label.textContent = active ? "Active" : "Inactive";
 
-        card.classList.toggle("inactive", !active);
-        label.textContent = active ? "Active" : "Inactive";
-
-        fetch(API_BASE + "/api/affiliate/toggle-code", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: token, code: code, active: active }),
-        })
-          .then(function (res) {
-            if (!res.ok) throw new Error("Request failed");
-            return res.json();
-          })
-          .then(function () {
-            setStatus(card, active ? "Code activated" : "Code deactivated", "success");
-          })
-          .catch(function () {
-            input.checked = previous;
-            card.classList.toggle("inactive", !previous);
-            label.textContent = previous ? "Active" : "Inactive";
-            setStatus(card, "Could not update code", "error");
-          });
-      }
-
-      fetch(API_BASE + "/api/affiliate/me?token=" + encodeURIComponent(token))
+      fetch(API_BASE + "/api/affiliate/toggle-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token, code: code, active: active }),
+      })
         .then(function (res) {
-          if (!res.ok) throw new Error("Unauthorized");
+          if (!res.ok) throw new Error("Request failed");
           return res.json();
         })
-        .then(render)
-        .catch(redirectHome);
-    })();
-  </script>
-</body>
-</html>
+        .then(function () {
+          setStatus(card, active ? "Code activated" : "Code deactivated", "success");
+        })
+        .catch(function () {
+          input.checked = previous;
+          card.classList.toggle("is-inactive", !previous);
+          label.textContent = previous ? "Active" : "Inactive";
+          setStatus(card, "Could not update code", "error");
+        });
+    }
+
+    fetch(API_BASE + "/api/affiliate/me?token=" + encodeURIComponent(token))
+      .then(function (res) {
+        if (!res.ok) throw new Error("Unauthorized");
+        return res.json();
+      })
+      .then(render)
+      .catch(redirectHome);
+  })();
+</script>

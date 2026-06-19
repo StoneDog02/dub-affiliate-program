@@ -1,9 +1,8 @@
-import type { AffiliateMetadata, TierKey } from "./types";
+import { parseTierFromCode } from "@/lib/affiliate/tiers";
+import type { AffiliateMetadata } from "./types";
 
 /** Prefix stored in Dub partner description to persist affiliate metadata as JSON. */
 export const METADATA_PREFIX = "BODYIQ_AFFILIATE_METADATA::";
-
-const TIERS: TierKey[] = ["10", "15", "20"];
 
 type PartnerLinks = Array<{ key?: string | null; shortLink?: string | null }> | null | undefined;
 
@@ -55,11 +54,10 @@ export function reconstructMetadataFromLinks(
 
   for (const link of links ?? []) {
     const key = link.key ?? "";
-    for (const tier of TIERS) {
-      if (key.includes(`-${tier}-`)) {
-        metadata[`code_${tier}`] = key;
-        metadata[`link_${tier}`] = link.shortLink ?? "";
-      }
+    const tier = parseTierFromCode(key);
+    if (tier) {
+      metadata[`code_${tier}`] = key;
+      metadata[`link_${tier}`] = link.shortLink ?? "";
     }
   }
 

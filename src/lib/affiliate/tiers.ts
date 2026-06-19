@@ -7,19 +7,28 @@ export const TIER_CONFIG: Record<TierKey, TierConfig> = {
   "20": { discount: 20, commission: 10, dubGroupId: env.dubGroupIdTierC },
 };
 
-const CODE_PATTERN = /-(10|15|20)-/;
+const LEGACY_TIER_PATTERN = /-(10|15|20)(?:-|$)/;
 
 /** Returns tier key from discount code name, or null if not an affiliate code. */
 export function parseTierFromCode(code: string): TierKey | null {
-  const normalized = code.toUpperCase();
-  if (normalized.includes("-10-")) return "10";
-  if (normalized.includes("-15-")) return "15";
-  if (normalized.includes("-20-")) return "20";
+  const upper = code.toUpperCase();
+
+  // Legacy dashed formats: STONEY-10-Y46R, STONEY-HARWARD-10
+  const legacy = upper.match(LEGACY_TIER_PATTERN);
+  if (legacy) {
+    return legacy[1] as TierKey;
+  }
+
+  // Compact format: SH10, STONEY10
+  if (upper.endsWith("20")) return "20";
+  if (upper.endsWith("15")) return "15";
+  if (upper.endsWith("10")) return "10";
+
   return null;
 }
 
 export function isAffiliateCode(code: string): boolean {
-  return CODE_PATTERN.test(code.toUpperCase());
+  return parseTierFromCode(code) !== null;
 }
 
 export function tierGroupId(tier: TierKey): string {

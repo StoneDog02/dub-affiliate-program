@@ -19,7 +19,7 @@ Dub partner approved (webhook)
   → Fire Klaviyo affiliate_approved event
 
 Shopify order paid (webhook)
-  → Parse tier from code name (-10- / -15- / -20-)
+  → Parse tier from code suffix (e.g. SH10, STONEY10)
   → Move partner to correct Dub group BEFORE commission fires
 
 Affiliate portal (Shopify page)
@@ -31,9 +31,9 @@ Affiliate portal (Shopify page)
 
 | Code pattern | Customer discount | Affiliate commission | Dub group env |
 |---|---|---|---|
-| `-10-` | 10% | 20% | `DUB_GROUP_ID_TIER_A` |
-| `-15-` | 15% | 15% | `DUB_GROUP_ID_TIER_B` |
-| `-20-` | 20% | 10% | `DUB_GROUP_ID_TIER_C` |
+| `10` suffix | 10% | 20% | `DUB_GROUP_ID_TIER_A` |
+| `15` suffix | 15% | 15% | `DUB_GROUP_ID_TIER_B` |
+| `20` suffix | 20% | 10% | `DUB_GROUP_ID_TIER_C` |
 
 ## Environment variables
 
@@ -86,12 +86,12 @@ Stored on each partner via the Dub API (serialized in partner `description`, ind
 ```json
 {
   "token": "[UUID]",
-  "code_10": "ASHLEY-10-K7M2",
-  "link_10": "https://bodyiq.dub.link/ASHLEY-10-K7M2",
-  "code_15": "ASHLEY-15-X3P9",
-  "link_15": "https://bodyiq.dub.link/ASHLEY-15-X3P9",
-  "code_20": "ASHLEY-20-R4N8",
-  "link_20": "https://bodyiq.dub.link/ASHLEY-20-R4N8"
+  "code_10": "SH10",
+  "link_10": "https://bodyiq.dub.link/SH10",
+  "code_15": "SH15",
+  "link_15": "https://bodyiq.dub.link/SH15",
+  "code_20": "SH20",
+  "link_20": "https://bodyiq.dub.link/SH20"
 }
 ```
 
