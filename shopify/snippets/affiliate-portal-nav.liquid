@@ -1,0 +1,16 @@
+{% comment %}
+  Affiliate portal nav link — only for logged-in affiliates.
+
+  Usage in header/nav:
+    {% render 'affiliate-portal-nav' %}
+    {% render 'affiliate-portal-nav', link_class: 'header__menu-item' %}
+{% endcomment %}
+
+{% if customer and customer.tags contains 'affiliate' %}
+  <a
+    href="/pages/affiliate-portal"
+    class="{{ link_class | default: 'affiliate-portal-nav__link' }}"
+  >
+    {{ link_label | default: 'Affiliate Portal' }}
+  </a>
+{% endif %}

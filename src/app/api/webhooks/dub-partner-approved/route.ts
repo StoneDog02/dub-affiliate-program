@@ -11,6 +11,7 @@ import {
 import { env } from "@/lib/env";
 import { sendAffiliateApprovedEmail } from "@/lib/klaviyo/client";
 import { createDiscountCode } from "@/lib/shopify/client";
+import { syncAffiliateShopifyCustomer } from "@/lib/shopify/customers";
 import { verifyDubWebhook } from "@/lib/utils/http";
 
 type DubWebhookPayload = {
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
 
     await updatePartnerMetadata({ email, name }, metadata);
 
-    const portalUrl = `${env.portalBaseUrl()}/pages/affiliate-portal?token=${token}`;
+    const portalUrl = `${env.portalBaseUrl()}/pages/affiliate-portal`;
     await sendAffiliateApprovedEmail({
       firstName,
       email,
@@ -108,7 +109,12 @@ export async function POST(req: Request) {
       metadata,
     });
 
-    return NextResponse.json({ ok: true, partnerId, token });
+    const shopifySync = await syncAffiliateShopifyCustomer(email, token);
+    if (!shopifySync.synced) {
+      console.info("[dub-partner-approved] Shopify customer sync skipped:", shopifySync.reason);
+    }
+
+    return NextResponse.json({ ok: true, partnerId, token, shopifySync });
   } catch (error) {
     console.error("[dub-partner-approved]", error);
     return NextResponse.json(

@@ -16,13 +16,18 @@ Dub partner approved (webhook)
   → Create 3 Shopify discount codes (10% / 15% / 20%)
   → Create 3 Dub tracking links → bodyiq.com/discount/[CODE]
   → Store metadata on Dub partner record
+  → Tag matching Shopify customer + store portal token metafield
   → Fire Klaviyo affiliate_approved event
+
+Shopify customer created (webhook)
+  → If email matches a Dub affiliate, tag customer + store portal token
 
 Shopify order paid (webhook)
   → Parse tier from code suffix (e.g. SH10, STONEY10)
   → Move partner to correct Dub group BEFORE commission fires
 
-Affiliate portal (Shopify page)
+Affiliate portal (Shopify page, login required)
+  → Token read from customer metafield (custom.affiliate_portal_token)
   → GET /api/affiliate/me?token=...
   → POST /api/affiliate/toggle-code
 ```
@@ -67,17 +72,37 @@ cp .env.example .env.local
 |---|---|---|
 | `POST` | `/api/webhooks/dub-partner-approved` | Provision codes + links on Dub `partner.enrolled` |
 | `POST` | `/api/webhooks/shopify-order-complete` | Move partner to tier group on order |
+| `POST` | `/api/webhooks/shopify-customer-created` | Link new Shopify customer to Dub affiliate |
 | `GET` | `/api/affiliate/me?token=` | Portal data + Shopify code status |
 | `POST` | `/api/affiliate/toggle-code` | Enable/disable a discount code |
 
 ## Shopify setup
 
 1. **Deploy** this Next.js app (e.g. Vercel) and set all env vars.
-2. **Webhook — Dub**: point to `https://[your-api]/api/webhooks/dub-partner-approved`, subscribe to `partner.enrolled`.
-3. **Webhook — Shopify**: point to `https://[your-api]/api/webhooks/shopify-order-complete`, topic `orders/paid`.
-4. **Portal page**: create a Shopify page at `/pages/affiliate-portal`, assign template `page.affiliate-portal`.
-5. Copy `shopify/templates/page.affiliate-portal.liquid` into your theme.
-6. Add a theme setting `affiliate_api_base` (type: text) or update the default API URL in the template.
+2. **Shopify app scopes**: ensure your Dev Dashboard app includes `write_customers` (for affiliate tagging + metafields).
+3. **Customer metafield** (Settings → Custom data → Customers):
+   - Name: `Affiliate portal token`
+   - Namespace and key: `custom.affiliate_portal_token`
+   - Type: Single line text
+   - Storefront access: **Read** (required for theme Liquid)
+4. **Webhook — Dub**: point to `https://[your-api]/api/webhooks/dub-partner-approved`, subscribe to `partner.enrolled`.
+5. **Webhook — Shopify**: point to `https://[your-api]/api/webhooks/shopify-order-complete`, topic `orders/paid`.
+6. **Webhook — Shopify**: point to `https://[your-api]/api/webhooks/shopify-customer-created`, topic `customers/create`.
+7. **Portal page**: create a Shopify page at `/pages/affiliate-portal`, assign template `page.affiliate-portal`.
+8. Copy `shopify/templates/page.affiliate-portal.liquid` into your theme.
+9. Copy `shopify/snippets/affiliate-portal-nav.liquid` into your theme and add `{% render 'affiliate-portal-nav' %}` to your header/nav.
+10. Add a theme setting `affiliate_api_base` (type: text) or update the default API URL in the template.
+
+### Affiliate portal access
+
+Affiliates must **log in** to bodyiq.com with the same email as their Dub partner account. On approval (or on first customer registration), the backend:
+
+- Adds customer tag `affiliate`
+- Sets metafield `custom.affiliate_portal_token` to their Dub portal token
+
+The portal page reads that metafield server-side. The nav snippet only renders for logged-in tagged customers. Welcome emails should link to `/pages/affiliate-portal` (login required — no token in the URL).
+
+**Existing affiliates** approved before this change need a one-time sync: ensure a Shopify customer exists with their email, then re-run provisioning or manually set the tag + metafield.
 
 ## Dub partner metadata
 

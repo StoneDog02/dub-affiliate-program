@@ -2,11 +2,32 @@
   BodyiQ Affiliate Portal
   Assign this template to the "affiliate-portal" page in Shopify Admin.
 
+  Requires a logged-in Shopify customer tagged "affiliate" with metafield
+  custom.affiliate_portal_token (set by the affiliate backend on approval).
+
   Uses the store theme layout (header, footer, nav). Portal UI is scoped under
   .affiliate-portal so it does not override global theme styles.
 
   Optional theme setting affiliate_api_base → your deployed Next.js API URL.
 {% endcomment %}
+
+{% assign portal_token = customer.metafields.custom.affiliate_portal_token %}
+{% assign portal_allowed = false %}
+{% if customer and customer.tags contains 'affiliate' and portal_token != blank %}
+  {% assign portal_allowed = true %}
+{% endif %}
+
+{% unless customer %}
+  <script>
+    window.location.replace("/account/login?return_url=" + encodeURIComponent(window.location.pathname));
+  </script>
+{% endunless %}
+
+{% if customer and portal_allowed == false %}
+  <script>
+    window.location.replace("/");
+  </script>
+{% endif %}
 
 <style>
   .affiliate-portal {
@@ -77,49 +98,145 @@
   }
 
   .affiliate-portal__card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto auto auto;
-    align-items: center;
-    gap: 10px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     background: var(--ap-surface);
     border: 1px solid var(--ap-border);
     border-radius: var(--ap-radius);
-    padding: 32px 40px;
+    padding: 24px 28px;
     box-shadow: var(--ap-shadow);
     transition: opacity 0.2s ease;
+  }
+
+  .affiliate-portal__card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px 32px;
   }
 
   .affiliate-portal__card.is-inactive {
     opacity: 0.55;
   }
 
-  .affiliate-portal__code {
-    grid-column: 1;
-    grid-row: 1;
-    font-size: clamp(1.375rem, 2.5vw, 1.75rem);
+  .affiliate-portal__card-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .affiliate-portal__link-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .affiliate-portal__link-url {
+    font-size: clamp(1.125rem, 2vw, 1.375rem);
     font-weight: 600;
-    letter-spacing: 0.04em;
-    margin: 0;
     word-break: break-all;
+    color: var(--ap-text);
+  }
+
+  .affiliate-portal__icon-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--ap-border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ap-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .affiliate-portal__icon-btn:hover {
+    background: var(--ap-bg);
+    border-color: #cbd5e1;
+    color: var(--ap-text);
+  }
+
+  .affiliate-portal__icon-btn.is-copied {
+    border-color: var(--ap-success);
+    color: var(--ap-success);
+  }
+
+  .affiliate-portal__link-dest {
+    font-size: 1rem;
+    color: var(--ap-muted);
+    word-break: break-all;
+    margin-bottom: 10px;
   }
 
   .affiliate-portal__sublabel {
-    grid-column: 1;
-    grid-row: 2;
-    font-size: 1.0625rem;
+    font-size: 1rem;
     color: var(--ap-muted);
     margin: 0;
   }
 
-  .affiliate-portal__toggle-row {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+  .affiliate-portal__card-aside {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    justify-content: center;
-    gap: 12px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .affiliate-portal__discount-tag {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 4px 6px 4px 12px;
+    border: 1px solid var(--ap-border);
+    border-radius: 999px;
+    background: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--ap-muted);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .affiliate-portal__discount-tag:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .affiliate-portal__discount-tag.is-copied {
+    border-color: #86efac;
+  }
+
+  .affiliate-portal__discount-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 8px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #047857;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .affiliate-portal__discount-pill svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+  }
+
+  .affiliate-portal__toggle-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
   }
 
   .affiliate-portal__toggle-label {
@@ -129,8 +246,8 @@
 
   .affiliate-portal__switch {
     position: relative;
-    width: 56px;
-    height: 32px;
+    width: 38px;
+    height: 22px;
     flex-shrink: 0;
   }
 
@@ -152,10 +269,10 @@
   .affiliate-portal__slider::before {
     content: "";
     position: absolute;
-    width: 26px;
-    height: 26px;
-    left: 3px;
-    top: 3px;
+    width: 18px;
+    height: 18px;
+    left: 2px;
+    top: 2px;
     background: #fff;
     border-radius: 50%;
     transition: transform 0.2s ease;
@@ -167,15 +284,19 @@
   }
 
   .affiliate-portal__switch input:checked + .affiliate-portal__slider::before {
-    transform: translateX(24px);
+    transform: translateX(16px);
   }
 
   .affiliate-portal__status {
-    grid-column: 1 / -1;
-    grid-row: 3;
     min-height: 1.25rem;
-    font-size: 0.9375rem;
-    margin-top: 4px;
+    font-size: 0.875rem;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid transparent;
+  }
+
+  .affiliate-portal__status:not(:empty) {
+    border-top-color: var(--ap-border);
   }
 
   .affiliate-portal__status.is-success { color: var(--ap-success); }
@@ -201,18 +322,21 @@
     }
 
     .affiliate-portal__card {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto auto auto auto;
-      padding: 24px;
-      gap: 12px;
+      padding: 20px;
     }
 
-    .affiliate-portal__code,
-    .affiliate-portal__sublabel,
-    .affiliate-portal__toggle-row,
-    .affiliate-portal__status {
-      grid-column: 1;
-      grid-row: auto;
+    .affiliate-portal__card-top {
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .affiliate-portal__card-aside {
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .affiliate-portal__discount-tag {
+      align-self: flex-start;
     }
 
     .affiliate-portal__toggle-row {
@@ -224,17 +348,16 @@
   }
 </style>
 
-<div class="affiliate-portal" id="affiliate-portal-app">
+<div class="affiliate-portal" id="affiliate-portal-app"{% unless portal_allowed %} hidden{% endunless %}>
   <div class="affiliate-portal__loading">Loading your portal…</div>
 </div>
 
+{% if portal_allowed %}
 <script>
   (function () {
     {% assign affiliate_api_base = settings.affiliate_api_base | default: "https://dub-affiliate-program.vercel.app" %}
     var API_BASE = {{ affiliate_api_base | json }};
-
-    var params = new URLSearchParams(window.location.search);
-    var token = params.get("token");
+    var token = {{ portal_token | json }};
 
     if (!token) {
       window.location.replace("/");
@@ -251,18 +374,98 @@
       return (fullName || "").trim().split(/\s+/)[0] || "there";
     }
 
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function displayLink(url) {
+      return String(url || "").replace(/^https?:\/\//, "");
+    }
+
+    function linkDestination(code) {
+      return "bodyiq.com/discount/" + code;
+    }
+
+    function copyText(text, el, onCopied) {
+      function done() {
+        if (onCopied) onCopied(el);
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () {
+          fallbackCopy(text, el, done);
+        });
+        return;
+      }
+
+      fallbackCopy(text, el, done);
+    }
+
+    function fallbackCopy(text, el, onSuccess) {
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "absolute";
+      area.style.left = "-9999px";
+      document.body.appendChild(area);
+      area.select();
+      try {
+        document.execCommand("copy");
+        onSuccess();
+      } catch (e) {
+        if (el.classList.contains("affiliate-portal__discount-tag")) {
+          var pill = el.querySelector(".affiliate-portal__discount-pill span");
+          if (pill) pill.textContent = "Failed";
+        }
+      }
+      document.body.removeChild(area);
+    }
+
+    var TAG_ICON =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+        '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<circle cx="7" cy="7" r="1.5" fill="currentColor"/>' +
+      '</svg>';
+
+    var COPY_ICON =
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+        '<rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/>' +
+        '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2"/>' +
+      '</svg>';
+
     function render(data) {
       var cardsHtml = data.tiers.map(function (tier, index) {
+        var link = tier.link || "";
+        var dest = link ? linkDestination(tier.code) : "";
         return (
           '<article class="affiliate-portal__card' + (tier.active ? "" : " is-inactive") + '" data-index="' + index + '">' +
-            '<div class="affiliate-portal__code">' + tier.code + '</div>' +
-            '<div class="affiliate-portal__sublabel">Gives customers ' + tier.discount + '% off · you earn ' + tier.commission + '% commission</div>' +
-            '<div class="affiliate-portal__toggle-row">' +
-              '<span class="affiliate-portal__toggle-label">' + (tier.active ? "Active" : "Inactive") + '</span>' +
-              '<label class="affiliate-portal__switch">' +
-                '<input type="checkbox" ' + (tier.active ? "checked" : "") + ' data-code="' + tier.code + '" aria-label="Toggle ' + tier.code + '">' +
-                '<span class="affiliate-portal__slider"></span>' +
-              '</label>' +
+            '<div class="affiliate-portal__card-top">' +
+              '<div class="affiliate-portal__card-main">' +
+                (link
+                  ? '<div class="affiliate-portal__link-row">' +
+                      '<span class="affiliate-portal__link-url">' + escapeHtml(displayLink(link)) + '</span>' +
+                      '<button type="button" class="affiliate-portal__icon-btn" data-copy-link="' + escapeHtml(link) + '" aria-label="Copy referral link">' + COPY_ICON + '</button>' +
+                    '</div>' +
+                    '<div class="affiliate-portal__link-dest">→ ' + escapeHtml(dest) + '</div>'
+                  : "") +
+                '<p class="affiliate-portal__sublabel">Gives customers ' + tier.discount + '% off · you earn ' + tier.commission + '% commission</p>' +
+              '</div>' +
+              '<div class="affiliate-portal__card-aside">' +
+                '<button type="button" class="affiliate-portal__discount-tag" data-copy-code="' + escapeHtml(tier.code) + '" aria-label="Copy discount code ' + escapeHtml(tier.code) + '">' +
+                  'Discount code' +
+                  '<span class="affiliate-portal__discount-pill">' + TAG_ICON + '<span>' + escapeHtml(tier.code) + '</span></span>' +
+                '</button>' +
+                '<div class="affiliate-portal__toggle-row">' +
+                  '<span class="affiliate-portal__toggle-label">' + (tier.active ? "Active" : "Inactive") + '</span>' +
+                  '<label class="affiliate-portal__switch">' +
+                    '<input type="checkbox" ' + (tier.active ? "checked" : "") + ' data-code="' + escapeHtml(tier.code) + '" aria-label="Toggle ' + escapeHtml(tier.code) + '">' +
+                    '<span class="affiliate-portal__slider"></span>' +
+                  '</label>' +
+                '</div>' +
+              '</div>' +
             '</div>' +
             '<div class="affiliate-portal__status" data-status></div>' +
           '</article>'
@@ -271,16 +474,41 @@
 
       app.innerHTML =
         '<section class="affiliate-portal__hero">' +
-          '<h1>Welcome back, ' + firstName(data.name) + '</h1>' +
-          '<p>Manage your discount codes and track performance in your partner dashboard.</p>' +
-          '<a class="affiliate-portal__btn" href="' + data.dub_portal_url + '" target="_blank" rel="noopener">View my dashboard →</a>' +
+          '<h1>Welcome back, ' + escapeHtml(firstName(data.name)) + '</h1>' +
+          '<p>Share your referral links and manage discount codes. Track performance in your partner dashboard.</p>' +
+          '<a class="affiliate-portal__btn" href="' + escapeHtml(data.dub_portal_url) + '" target="_blank" rel="noopener">View my dashboard →</a>' +
         '</section>' +
-        '<h2 class="affiliate-portal__section-title">Your discount codes</h2>' +
+        '<h2 class="affiliate-portal__section-title">Your referral links</h2>' +
         '<div class="affiliate-portal__cards">' + cardsHtml + '</div>';
 
       app.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
         input.addEventListener("change", function (event) {
           toggleCode(event.target, data);
+        });
+      });
+
+      app.querySelectorAll("[data-copy-link]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          copyText(button.getAttribute("data-copy-link"), button, function (el) {
+            el.classList.add("is-copied");
+            setTimeout(function () { el.classList.remove("is-copied"); }, 2000);
+          });
+        });
+      });
+
+      app.querySelectorAll("[data-copy-code]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var code = button.getAttribute("data-copy-code");
+          var pillText = button.querySelector(".affiliate-portal__discount-pill span");
+          var original = pillText ? pillText.textContent : "";
+          copyText(code, button, function (el) {
+            el.classList.add("is-copied");
+            if (pillText) pillText.textContent = "Copied!";
+            setTimeout(function () {
+              el.classList.remove("is-copied");
+              if (pillText) pillText.textContent = original;
+            }, 2000);
+          });
         });
       });
     }
@@ -336,3 +564,4 @@
       .catch(redirectHome);
   })();
 </script>
+{% endif %}

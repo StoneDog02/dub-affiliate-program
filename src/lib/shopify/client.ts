@@ -8,7 +8,7 @@ type GraphQLResponse<T> = {
   errors?: Array<{ message: string }>;
 };
 
-async function shopifyGraphql<T>(
+export async function shopifyGraphql<T>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {

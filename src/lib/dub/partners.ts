@@ -86,6 +86,23 @@ export async function findPartnerByCode(
   return null;
 }
 
+export async function findPartnerByEmail(
+  email: string,
+): Promise<(DubPartner & { metadata: AffiliateMetadata }) | null> {
+  const normalized = email.trim().toLowerCase();
+
+  for (const partner of await listAllPartners()) {
+    if (partner.email?.trim().toLowerCase() !== normalized) continue;
+
+    const metadata = resolvePartnerMetadata(partner);
+    if (metadata?.token) {
+      return { ...partner, metadata };
+    }
+  }
+
+  return null;
+}
+
 /** Persist affiliate metadata on the Dub partner record via description + tenantId. */
 export async function updatePartnerMetadata(
   partner: Pick<DubPartner, "email" | "name">,
