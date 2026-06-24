@@ -20,7 +20,7 @@ export function verifyDubWebhook(rawBody: string, signature: string | null): boo
 /**
  * Optional shared-secret check for inbound CareValidate webhooks.
  * When CAREVALIDATE_WEBHOOK_SECRET is set, the request must include the same
- * value in `x-webhook-secret` or `x-carevalidate-webhook-secret`.
+ * value in a CareValidate auth header (cv-api-key is the most likely).
  */
 export function verifyCareValidateWebhook(req: Request): boolean {
   const secret = process.env.CAREVALIDATE_WEBHOOK_SECRET?.trim();
@@ -29,6 +29,8 @@ export function verifyCareValidateWebhook(req: Request): boolean {
   }
 
   const headerSecret =
+    req.headers.get("cv-api-key") ??
+    req.headers.get("CV-Api-Key") ??
     req.headers.get("x-webhook-secret") ??
     req.headers.get("x-carevalidate-webhook-secret");
 
