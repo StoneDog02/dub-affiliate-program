@@ -1,0 +1,553 @@
+{% comment %}
+  BodyiQ Affiliate Program landing page
+  Assign to a Shopify page with handle "affiliates" → /pages/affiliates
+
+  Optional theme settings:
+    affiliate_apply_url — Dub public application form URL
+{% endcomment %}
+
+{% assign apply_url = settings.affiliate_apply_url | default: "https://partners.dub.co/bodyiq/apply" %}
+{% assign is_affiliate = false %}
+{% if customer and customer.tags contains 'affiliate' %}
+  {% assign is_affiliate = true %}
+{% endif %}
+{% assign affiliates_return_url = '/pages/affiliates' | url_encode %}
+
+<style>
+  .affiliate-landing {
+    --al-bg: #fafafa;
+    --al-surface: #ffffff;
+    --al-text: #111111;
+    --al-muted: #6b7280;
+    --al-border: #e5e7eb;
+    --al-accent: #111111;
+
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+    color: var(--al-text);
+    font-size: 18px;
+    line-height: 1.65;
+  }
+
+  .affiliate-landing p,
+  .affiliate-landing li {
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  .affiliate-landing__eyebrow {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--al-muted);
+    margin: 0 0 12px;
+  }
+
+  .affiliate-landing__title {
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 0 0 16px;
+    letter-spacing: -0.02em;
+  }
+
+  .affiliate-landing__lead {
+    font-size: 22px;
+    color: var(--al-muted);
+    margin: 0 0 40px;
+    line-height: 1.55;
+  }
+
+  .affiliate-landing__card {
+    background: var(--al-surface);
+    border: 1px solid var(--al-border);
+    border-radius: 16px;
+    padding: 28px 28px 32px;
+    margin-bottom: 32px;
+    font-size: 18px;
+  }
+
+  .affiliate-landing__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 28px;
+    display: grid;
+    gap: 20px;
+    font-size: 18px;
+  }
+
+  .affiliate-landing__list li {
+    padding-left: 28px;
+    position: relative;
+  }
+
+  .affiliate-landing__list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--al-accent);
+  }
+
+  .affiliate-landing__steps {
+    display: grid;
+    gap: 12px;
+    margin: 0 0 32px;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .affiliate-landing__steps li {
+    counter-increment: step;
+    padding-left: 36px;
+    position: relative;
+    color: var(--al-muted);
+    font-size: 18px;
+    line-height: 1.55;
+  }
+
+  .affiliate-landing__steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--al-bg);
+    border: 1px solid var(--al-border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--al-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .affiliate-landing__steps strong {
+    color: var(--al-text);
+    font-weight: 600;
+  }
+
+  .affiliate-landing__steps a {
+    color: var(--al-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .affiliate-landing__section-title {
+    margin: 0 0 16px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .affiliate-landing__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 32px;
+    background: var(--al-accent);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 999px;
+    transition: opacity 0.15s ease;
+  }
+
+  .affiliate-landing__btn:hover {
+    opacity: 0.88;
+    color: #fff;
+  }
+
+  .affiliate-landing__btn--disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border: none;
+    font: inherit;
+  }
+
+  .affiliate-landing__btn--disabled:hover {
+    opacity: 1;
+    color: #9ca3af;
+  }
+
+  .affiliate-landing__apply-tooltip-wrap {
+    position: relative;
+    display: inline-flex;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .affiliate-landing__tooltip {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: max-content;
+    max-width: min(280px, calc(100vw - 48px));
+    padding: 12px 14px;
+    background: var(--al-text);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.45;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(4px);
+    transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
+  }
+
+  .affiliate-landing__tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: calc(50% + var(--arrow-offset, 0px));
+    margin-left: -6px;
+    border: 6px solid transparent;
+    border-top-color: var(--al-text);
+  }
+
+  .affiliate-landing__tooltip-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    color: #fca5a5;
+  }
+
+  .affiliate-landing__apply-tooltip-wrap:hover .affiliate-landing__tooltip,
+  .affiliate-landing__apply-tooltip-wrap:focus-within .affiliate-landing__tooltip,
+  .affiliate-landing__apply-tooltip-wrap.is-tooltip-visible .affiliate-landing__tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (pointer: coarse) {
+    .affiliate-landing__apply-tooltip-wrap:hover .affiliate-landing__tooltip,
+    .affiliate-landing__apply-tooltip-wrap:focus-within .affiliate-landing__tooltip {
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(-50%) translateY(4px);
+    }
+
+    .affiliate-landing__apply-tooltip-wrap.is-tooltip-visible .affiliate-landing__tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  .affiliate-landing__btn--secondary {
+    background: transparent;
+    color: var(--al-text);
+    border: 1px solid var(--al-border);
+  }
+
+  .affiliate-landing__btn--secondary:hover {
+    color: var(--al-text);
+  }
+
+  .affiliate-landing__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .affiliate-landing__note {
+    font-size: 16px;
+    color: var(--al-muted);
+    margin: 20px 0 0;
+    line-height: 1.55;
+  }
+
+  .affiliate-landing__fyi {
+    margin: 0 0 28px;
+    padding: 16px 18px;
+    background: var(--al-bg);
+    border: 1px solid var(--al-border);
+    border-radius: 12px;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--al-muted);
+  }
+
+  .affiliate-landing__fyi strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--al-text);
+    font-weight: 600;
+  }
+
+  .affiliate-landing__footer-link {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid var(--al-border);
+    font-size: 18px;
+    color: var(--al-muted);
+  }
+
+  .affiliate-landing__footer-link a {
+    color: var(--al-text);
+    font-weight: 600;
+  }
+
+  @media (max-width: 640px) {
+    .affiliate-landing {
+      padding: 40px 20px 72px;
+    }
+
+    .affiliate-landing__card {
+      padding: 22px 20px 26px;
+    }
+  }
+</style>
+
+<section class="affiliate-landing">
+  <p class="affiliate-landing__eyebrow">Partner program</p>
+  <h1 class="affiliate-landing__title">Join the BODYiQ affiliate program</h1>
+  <p class="affiliate-landing__lead">
+    Share science-backed health with your audience. When they shop through your link,
+    you earn commission — and they get an exclusive discount.
+  </p>
+
+  {% if is_affiliate %}
+    <div class="affiliate-landing__card">
+      <p style="margin: 0 0 20px;">
+        You're already part of the program. Head to your portal to manage referral links
+        and discount codes.
+      </p>
+      <div class="affiliate-landing__actions">
+        <a class="affiliate-landing__btn" href="/pages/affiliate-portal">Go to your portal</a>
+      </div>
+    </div>
+  {% else %}
+    <div class="affiliate-landing__card">
+      <ul class="affiliate-landing__list">
+        <li>Personal referral links and discount codes for your audience</li>
+        <li>A partner dashboard to track clicks, conversions, and earnings</li>
+        <li>Flexible tiers — choose the offer that fits how you promote</li>
+      </ul>
+
+      <p class="affiliate-landing__section-title">How it works</p>
+      <ol class="affiliate-landing__steps">
+        <li>
+          <strong>Create or log into your BODYiQ account</strong>
+          —
+          {% if customer %}
+            you're signed in as {{ customer.email }}.
+          {% else %}
+            <a href="{{ routes.account_register_url }}?return_url={{ affiliates_return_url }}">Create an account</a>
+            or
+            <a href="{{ routes.account_login_url }}?return_url={{ affiliates_return_url }}">log in</a>
+            with the email you'll use to apply.
+          {% endif %}
+        </li>
+        <li><strong>Apply</strong> — tell us a bit about you and your audience</li>
+        <li><strong>Get approved</strong> — we'll review and send you portal access by email</li>
+        <li><strong>Start sharing</strong> — open your portal, grab your links, and go</li>
+      </ol>
+
+      <p class="affiliate-landing__fyi">
+        <strong>Your referral links and discount codes are created for you automatically.</strong>
+        Once you're approved, you'll receive a welcome email explaining the full program and
+        how to access everything in your affiliate portal — no extra setup on your end.
+      </p>
+
+      <div class="affiliate-landing__actions">
+        {% if customer %}
+          <a
+            class="affiliate-landing__btn"
+            href="{{ apply_url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Apply now
+          </a>
+        {% else %}
+          <div class="affiliate-landing__apply-tooltip-wrap">
+            <button
+              type="button"
+              class="affiliate-landing__btn affiliate-landing__btn--disabled"
+              aria-disabled="true"
+              aria-describedby="affiliate-apply-tooltip"
+            >
+              Apply now
+            </button>
+            <div
+              id="affiliate-apply-tooltip"
+              class="affiliate-landing__tooltip"
+              role="tooltip"
+            >
+              <svg
+                class="affiliate-landing__tooltip-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+              </svg>
+              <span>Must create or log in to a shopify account.</span>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+      <p class="affiliate-landing__note">
+        {% if customer %}
+          Signed in as {{ customer.email }}. Use this same email when you apply.
+        {% else %}
+          Complete step 1 above to unlock Apply now. Use the same email for your account and application.
+        {% endif %}
+        Applications are reviewed by our team. You'll receive an email once you're approved.
+      </p>
+    </div>
+
+    <p class="affiliate-landing__footer-link">
+      Already approved?
+      <a href="{{ routes.account_login_url }}?return_url={{ '/pages/affiliate-portal' | url_encode }}">Log in</a>
+      to access your affiliate portal.
+    </p>
+  {% endif %}
+</section>
+
+<script>
+  (function () {
+    var wrap = document.querySelector(".affiliate-landing__apply-tooltip-wrap");
+    if (!wrap) return;
+
+    var coarsePointerQuery = window.matchMedia("(pointer: coarse)");
+    var suppressDismiss = false;
+    var lastToggleAt = 0;
+    var tooltip = wrap.querySelector(".affiliate-landing__tooltip");
+
+    function usesTapToggle() {
+      return coarsePointerQuery.matches;
+    }
+
+    function clearTooltipPosition() {
+      if (!tooltip) return;
+      tooltip.style.removeProperty("transform");
+      tooltip.style.removeProperty("--arrow-offset");
+    }
+
+    function positionTooltip() {
+      if (!tooltip) return;
+
+      clearTooltipPosition();
+      tooltip.style.transform = "translateX(-50%) translateY(0)";
+
+      var rect = tooltip.getBoundingClientRect();
+      var padding = 16;
+      var shift = 0;
+
+      if (rect.left < padding) {
+        shift = padding - rect.left;
+      } else if (rect.right > window.innerWidth - padding) {
+        shift = window.innerWidth - padding - rect.right;
+      }
+
+      if (shift !== 0) {
+        tooltip.style.transform =
+          "translateX(calc(-50% + " + shift + "px)) translateY(0)";
+        tooltip.style.setProperty("--arrow-offset", -shift + "px");
+      }
+    }
+
+    function schedulePositionTooltip() {
+      window.requestAnimationFrame(positionTooltip);
+    }
+
+    function toggleTooltip(event) {
+      if (!usesTapToggle()) return;
+
+      var now = Date.now();
+      if (now - lastToggleAt < 400) return;
+      lastToggleAt = now;
+
+      event.preventDefault();
+      event.stopPropagation();
+      suppressDismiss = true;
+
+      var willShow = !wrap.classList.contains("is-tooltip-visible");
+      wrap.classList.toggle("is-tooltip-visible");
+
+      if (willShow) {
+        schedulePositionTooltip();
+      } else {
+        clearTooltipPosition();
+      }
+
+      window.setTimeout(function () {
+        suppressDismiss = false;
+      }, 0);
+    }
+
+    wrap.addEventListener("mouseenter", function () {
+      if (usesTapToggle()) return;
+      schedulePositionTooltip();
+    });
+
+    wrap.addEventListener("mouseleave", clearTooltipPosition);
+
+    wrap.addEventListener("focusin", schedulePositionTooltip);
+
+    wrap.addEventListener("focusout", function (event) {
+      if (!wrap.contains(event.relatedTarget)) {
+        clearTooltipPosition();
+      }
+    });
+
+    window.addEventListener("resize", function () {
+      if (
+        wrap.classList.contains("is-tooltip-visible") ||
+        wrap.matches(":hover")
+      ) {
+        schedulePositionTooltip();
+      }
+    });
+
+    wrap.addEventListener("pointerup", function (event) {
+      if (event.pointerType === "mouse") return;
+      toggleTooltip(event);
+    });
+
+    wrap.addEventListener("click", toggleTooltip);
+
+    document.addEventListener("click", function (event) {
+      if (suppressDismiss) return;
+      if (!wrap.contains(event.target)) {
+        wrap.classList.remove("is-tooltip-visible");
+        clearTooltipPosition();
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        wrap.classList.remove("is-tooltip-visible");
+        clearTooltipPosition();
+      }
+    });
+  })();
+</script>

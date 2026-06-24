@@ -18,6 +18,7 @@ Dub partner approved (webhook)
   → Store metadata on Dub partner record
   → Tag matching Shopify customer + store portal token metafield
   → Fire Klaviyo affiliate_approved event
+  → Manual: create same 3 promo codes in CareValidate admin
 
 Shopify customer created (webhook)
   → If email matches a Dub affiliate, tag customer + store portal token
@@ -25,6 +26,11 @@ Shopify customer created (webhook)
 Shopify order paid (webhook)
   → Parse tier from code suffix (e.g. SH10, STONEY10)
   → Move partner to correct Dub group BEFORE commission fires
+
+CareValidate payment completed (webhook)
+  → Read affiliate promo from payload (case.referralCode)
+  → Move partner to correct Dub tier group
+  → Record sale commission in Dub (commissions.create)
 
 Affiliate portal (Shopify page, login required)
   → Token read from customer metafield (custom.affiliate_portal_token)
@@ -65,6 +71,27 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_API_BASE_URL` | Deployed Next.js URL (for Shopify portal JS) |
 | `DUB_PARTNER_PORTAL_URL` | Optional, defaults to `https://partners.dub.co` |
 | `DUB_LINK_DOMAIN` | Optional, defaults to `bodyiq.dub.link` |
+| `CAREVALIDATE_INTAKE_BASE_URL` | Patient intake entry, e.g. `https://intake.bodyiq.com` |
+| `CAREVALIDATE_WEBHOOK_SECRET` | Optional shared secret; require `x-webhook-secret` header on CV webhooks |
+
+## CareValidate clinical flow
+
+CareValidate does not expose a promo create API. On each new affiliate approval:
+
+1. **Shopify + Dub** — provisioned automatically by the approval webhook.
+2. **CareValidate** — manually create the same three code strings in **Promo Codes** admin (10% / 15% / 20% patient discount).
+3. **Patient** — enters code at `intake.bodyiq.com` `/payment` (manual entry until URL persistence is fixed).
+4. **Commission** — `PAYMENT_COMPLETED` webhook → `POST /api/webhooks/carevalidate` → Dub `commissions.create`.
+
+Register the webhook in CareValidate admin (**Settings → API → Webhooks**):
+
+```
+https://[your-api]/api/webhooks/carevalidate
+```
+
+Subscribe to **PAYMENT_COMPLETED**. Confirm with CareValidate that the promo used at payment appears in `payload.case.referralCode` (or ask which field to use).
+
+If `CAREVALIDATE_WEBHOOK_SECRET` is set, CareValidate must send the same value in the `x-webhook-secret` request header (configure if their admin supports custom headers).
 
 ## API routes
 
@@ -73,6 +100,7 @@ cp .env.example .env.local
 | `POST` | `/api/webhooks/dub-partner-approved` | Provision codes + links on Dub `partner.enrolled` |
 | `POST` | `/api/webhooks/shopify-order-complete` | Move partner to tier group on order |
 | `POST` | `/api/webhooks/shopify-customer-created` | Link new Shopify customer to Dub affiliate |
+| `POST` | `/api/webhooks/carevalidate` | Record Dub commission on CV `PAYMENT_COMPLETED` |
 | `GET` | `/api/affiliate/me?token=` | Portal data + Shopify code status |
 | `POST` | `/api/affiliate/toggle-code` | Enable/disable a discount code |
 
@@ -88,10 +116,14 @@ cp .env.example .env.local
 4. **Webhook — Dub**: point to `https://[your-api]/api/webhooks/dub-partner-approved`, subscribe to `partner.enrolled`.
 5. **Webhook — Shopify**: point to `https://[your-api]/api/webhooks/shopify-order-complete`, topic `orders/paid`.
 6. **Webhook — Shopify**: point to `https://[your-api]/api/webhooks/shopify-customer-created`, topic `customers/create`.
-7. **Portal page**: create a Shopify page at `/pages/affiliate-portal`, assign template `page.affiliate-portal`.
-8. Copy `shopify/templates/page.affiliate-portal.liquid` into your theme.
-9. Copy `shopify/snippets/affiliate-portal-nav.liquid` into your theme and add `{% render 'affiliate-portal-nav' %}` to your header/nav.
-10. Add a theme setting `affiliate_api_base` (type: text) or update the default API URL in the template.
+7. **Webhook — CareValidate**: point to `https://[your-api]/api/webhooks/carevalidate`, event `PAYMENT_COMPLETED`.
+8. **Portal page**: create a Shopify page at `/pages/affiliate-portal`, assign template `page.affiliate-portal`.
+9. Copy `shopify/templates/page.affiliate-portal.liquid` into your theme.
+10. Copy `shopify/snippets/affiliate-portal-nav.liquid` into your theme and add `{% render 'affiliate-portal-nav' %}` to your header/nav.
+11. Copy `shopify/templates/page.affiliates.liquid` and create a Shopify page with handle `affiliates`, template `page.affiliates`.
+12. Copy `shopify/snippets/become-affiliate-footer-link.liquid` and add `{% render 'become-affiliate-footer-link' %}` to your theme footer.
+13. Add theme settings from `shopify/config/settings_schema.snippet.json` (`affiliate_api_base`, `affiliate_apply_url`) or update defaults in the templates.
+14. Optional: add a URL redirect from `/affiliates` → `/pages/affiliates` in Shopify Admin → Online Store → Navigation → URL Redirects.
 
 ### Affiliate portal access
 

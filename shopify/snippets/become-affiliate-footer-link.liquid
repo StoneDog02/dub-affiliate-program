@@ -1,0 +1,19 @@
+{% comment %}
+  Footer link to the affiliate program landing page.
+  Hidden for logged-in affiliates (they use the portal nav instead).
+
+  Usage in footer:
+    {% render 'become-affiliate-footer-link' %}
+    {% render 'become-affiliate-footer-link', link_class: 'footer__link' %}
+{% endcomment %}
+
+{% unless customer and customer.tags contains 'affiliate' %}
+  <a
+    href="/pages/affiliates"
+    class="{{ link_class | default: 'become-affiliate-footer-link' }}"
+  >
+    <span class="reversed-link__text">
+      {{ link_label | default: 'Become an affiliate' }}
+    </span>
+  </a>
+{% endunless %}

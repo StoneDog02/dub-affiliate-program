@@ -18,7 +18,8 @@ export async function OPTIONS(req: NextRequest) {
 /**
  * POST /api/affiliate/toggle-code
  *
- * Enables or disables a Shopify discount code for the authenticated affiliate.
+ * Enables or disables a Shopify discount code.
+ * CareValidate promos must be toggled manually in CV admin.
  * Body: { token, code, active }
  */
 export async function POST(req: NextRequest) {

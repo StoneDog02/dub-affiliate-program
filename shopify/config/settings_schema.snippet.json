@@ -1,5 +1,5 @@
 {
-  "name": "Affiliate Portal",
+  "name": "Affiliate Program",
   "settings": [
     {
       "type": "header",
@@ -11,6 +11,16 @@
       "label": "Affiliate API base URL",
       "default": "https://your-api-domain.com",
       "info": "Deployed Next.js API URL (no trailing slash). Used by the affiliate portal page."
+    },
+    {
+      "type": "header",
+      "content": "Affiliate application"
+    },
+    {
+      "type": "url",
+      "id": "affiliate_apply_url",
+      "label": "Dub application form URL",
+      "info": "Public apply link from Dub Partners (e.g. https://partners.dub.co/bodyiq/apply). Used on the /pages/affiliates landing page."
     }
   ]
 }

@@ -1,16 +1,35 @@
 {% comment %}
   Affiliate portal nav link — only for logged-in affiliates.
 
-  Usage in header/nav:
-    {% render 'affiliate-portal-nav' %}
-    {% render 'affiliate-portal-nav', link_class: 'header__menu-item' %}
+  Desktop (inside desktop-menu.liquid, after the menu loop — copy classes from a
+  simple top-level link in that same file):
+    {% render 'affiliate-portal-nav',
+      wrap_item: true,
+      item_class: 'menu__item',
+      link_class: 'menu__item-link',
+      link_label: 'Portal'
+    %}
+
+  Mobile (menu-drawer.liquid, after the menu loop):
+    {% render 'affiliate-portal-nav',
+      wrap_item: true,
+      item_class: 'menu-drawer__item',
+      link_class: 'menu-drawer__item-link menu-drawer__item-link-heading h3 flex items-center justify-between focus-visible--inset'
+    %}
 {% endcomment %}
 
 {% if customer and customer.tags contains 'affiliate' %}
+  {% if wrap_item %}
+    <li class="{{ item_class }}">
+  {% endif %}
   <a
     href="/pages/affiliate-portal"
     class="{{ link_class | default: 'affiliate-portal-nav__link' }}"
+    style="white-space: nowrap;"
   >
-    {{ link_label | default: 'Affiliate Portal' }}
+    {{- link_label | default: 'Affiliate Portal' -}}
   </a>
+  {% if wrap_item %}
+    </li>
+  {% endif %}
 {% endif %}

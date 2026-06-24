@@ -28,4 +28,6 @@ export const env = {
   dubLinkDomain: () => process.env.DUB_LINK_DOMAIN ?? "bodyiq.dub.link",
   dubPartnerPortalUrl: () =>
     process.env.DUB_PARTNER_PORTAL_URL ?? "https://partners.dub.co",
+  careValidateIntakeBaseUrl: () =>
+    process.env.CAREVALIDATE_INTAKE_BASE_URL ?? "https://intake.bodyiq.com",
 };

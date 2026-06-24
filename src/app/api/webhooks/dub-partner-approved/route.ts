@@ -30,7 +30,8 @@ const TIERS = ["10", "15", "20"] as const;
  * POST /api/webhooks/dub-partner-approved
  *
  * Fires when Dub approves/enrolls a new partner (partner.enrolled webhook).
- * Provisions Shopify discount codes, Dub tracking links, partner metadata, and Klaviyo event.
+ * Provisions Shopify discount codes, Dub tracking links, partner metadata,
+ * and Klaviyo event. CareValidate promos are created manually in CV admin.
  */
 export async function POST(req: Request) {
   const rawBody = await req.text();
@@ -79,12 +80,21 @@ export async function POST(req: Request) {
       link_20: "",
     };
 
+    const tierCodes: Array<{ tier: (typeof TIERS)[number]; code: string; discount: number }> =
+      [];
+
     for (const tier of TIERS) {
       const code = buildDiscountCode(name, tier);
       const discount = Number(tier);
-      const destination = `${env.portalBaseUrl()}/discount/${code}`;
+      tierCodes.push({ tier, code, discount });
+    }
 
+    for (const { code, discount } of tierCodes) {
       await createDiscountCode(code, discount);
+    }
+
+    for (const { tier, code } of tierCodes) {
+      const destination = `${env.portalBaseUrl()}/discount/${code}`;
       const link = await createPartnerLink(partnerId, code, destination);
 
       if (tier === "10") {
@@ -114,7 +124,14 @@ export async function POST(req: Request) {
       console.info("[dub-partner-approved] Shopify customer sync skipped:", shopifySync.reason);
     }
 
-    return NextResponse.json({ ok: true, partnerId, token, shopifySync });
+    return NextResponse.json({
+      ok: true,
+      partnerId,
+      token,
+      shopifySync,
+      careValidateNote:
+        "Create matching promo codes manually in CareValidate admin (same strings as Shopify).",
+    });
   } catch (error) {
     console.error("[dub-partner-approved]", error);
     return NextResponse.json(
