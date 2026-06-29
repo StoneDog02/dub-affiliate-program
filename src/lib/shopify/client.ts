@@ -51,7 +51,7 @@ type DiscountNode = {
   };
 };
 
-/** Create a percentage-off discount code — lifetime, unlimited uses, active. */
+/** Create a percentage-off discount code — lifetime, unlimited uses, active on one-time and subscription orders. */
 export async function createDiscountCode(
   code: string,
   percentage: number,
@@ -76,9 +76,12 @@ export async function createDiscountCode(
         customerGets: {
           value: { percentage: percentage / 100 },
           items: { all: true },
+          appliesOnOneTimePurchase: true,
+          appliesOnSubscription: true,
         },
         customerSelection: { all: true },
         appliesOncePerCustomer: false,
+        recurringCycleLimit: 0,
       },
     },
   );
