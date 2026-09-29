@@ -4,8 +4,8 @@ import {
   reconstructMetadataFromLinks,
   serializeMetadata,
 } from "@/lib/affiliate/metadata";
-import type { AffiliateMetadata, TierKey } from "@/lib/affiliate/types";
-import { tierGroupId } from "@/lib/affiliate/tiers";
+import type { AffiliateMetadata } from "@/lib/affiliate/types";
+import { homeGroupId } from "@/lib/affiliate/tiers";
 import { getDubClient, type DubPartner } from "./client";
 
 /** Paginate through all program partners (low volume — acceptable for portal lookups). */
@@ -113,6 +113,7 @@ export async function updatePartnerMetadata(
     email: partner.email!,
     name: partner.name,
     tenantId: metadata.token,
+    groupId: homeGroupId(),
     description: serializeMetadata(metadata),
   });
 }
@@ -133,20 +134,16 @@ export async function createPartnerLink(
 }
 
 /**
- * Move partner to the commission tier group before Dub attributes the sale.
- * Uses partner upsert with groupId — required for tier-based commission rates.
+ * Put a partner in the single 20% home group.
+ * Uses partner upsert with groupId. Does not rewrite commissions already recorded.
  */
-export async function movePartnerToTierGroup(
-  partner: DubPartner,
-  tier: TierKey,
-): Promise<void> {
-  const dub = getDubClient();
-  const groupId = tierGroupId(tier);
-
+export async function movePartnerToHomeGroup(partner: DubPartner): Promise<boolean> {
+  const groupId = homeGroupId();
   if (partner.groupId === groupId) {
-    return;
+    return false;
   }
 
+  const dub = getDubClient();
   await dub.partners.create({
     email: partner.email!,
     name: partner.name,
@@ -154,6 +151,25 @@ export async function movePartnerToTierGroup(
     groupId,
     description: partner.description ?? undefined,
   });
+  return true;
+}
+
+export async function moveAllPartnersToHomeGroup(): Promise<{
+  moved: number;
+  unchanged: number;
+}> {
+  let moved = 0;
+  let unchanged = 0;
+
+  for (const partner of await listAllPartners()) {
+    if (await movePartnerToHomeGroup(partner)) {
+      moved += 1;
+    } else {
+      unchanged += 1;
+    }
+  }
+
+  return { moved, unchanged };
 }
 
 export async function getPartnerById(partnerId: string): Promise<DubPartner | null> {

@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
-import { parseTierFromCode } from "@/lib/affiliate/tiers";
 import {
   extractAffiliatePromoCode,
   patientCountry,
   paymentAmountToCents,
 } from "@/lib/carevalidate/payload";
 import type { CareValidateWebhookPayload } from "@/lib/carevalidate/types";
-import { recordCareValidateSale } from "@/lib/dub/commissions";
-import { findPartnerByCode, movePartnerToTierGroup } from "@/lib/dub/partners";
+import { correctCommissionsForInvoice } from "@/lib/dub/commission-corrections";
+import {
+  isDuplicateCommissionError,
+  recordCareValidateSale,
+} from "@/lib/dub/commissions";
+import { findPartnerByCode } from "@/lib/dub/partners";
 import { verifyCareValidateWebhook } from "@/lib/utils/http";
 
 /**
  * POST /api/webhooks/carevalidate
  *
  * CareValidate PAYMENT_COMPLETED → affiliate promo lookup → Dub commission.
- * Promo codes are created manually in CareValidate admin (same strings as Shopify).
+ * The sale is tied to that promo's link, then earnings are set from the code.
  */
 export async function POST(req: Request) {
   if (!verifyCareValidateWebhook(req)) {
@@ -52,11 +55,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason: "no_affiliate_code" });
   }
 
-  const tier = parseTierFromCode(affiliateCode);
-  if (!tier) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "unknown_tier" });
-  }
-
   const saleAmountCents = paymentAmountToCents(payment.amount);
   if (!saleAmountCents) {
     return NextResponse.json({ ok: true, skipped: true, reason: "invalid_amount" });
@@ -66,6 +64,7 @@ export async function POST(req: Request) {
   const submitter = caseData?.submitter;
   const customerExternalId =
     submitter?.id ?? submitter?.email ?? caseData?.id ?? payment.id;
+  const invoiceId = `cv_${payment.id}`;
 
   try {
     const partner = await findPartnerByCode(affiliateCode);
@@ -73,30 +72,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, skipped: true, reason: "partner_not_found" });
     }
 
-    await movePartnerToTierGroup(partner, tier);
+    try {
+      await recordCareValidateSale({
+        partner,
+        saleAmountCents,
+        invoiceId,
+        saleEventDate: payment.paymentDate,
+        affiliateCode,
+        customer: {
+          externalId: customerExternalId,
+          email: submitter?.email,
+          name: [submitter?.firstName, submitter?.lastName].filter(Boolean).join(" ") || undefined,
+          country: patientCountry(submitter),
+        },
+      });
+    } catch (error) {
+      if (!isDuplicateCommissionError(error)) throw error;
+    }
 
-    const commission = await recordCareValidateSale({
-      partner,
-      saleAmountCents,
-      invoiceId: `cv_${payment.id}`,
-      saleEventDate: payment.paymentDate,
-      affiliateCode,
-      customer: {
-        externalId: customerExternalId,
-        email: submitter?.email,
-        name: [submitter?.firstName, submitter?.lastName].filter(Boolean).join(" ") || undefined,
-        country: patientCountry(submitter),
-      },
+    const correction = await correctCommissionsForInvoice({
+      invoiceId,
+      orderCodes: [affiliateCode],
+      wait: true,
     });
+
+    if (correction.action === "pending") {
+      return NextResponse.json({ error: "Commission not ready" }, { status: 500 });
+    }
 
     return NextResponse.json({
       ok: true,
       code: affiliateCode,
-      tier,
       partnerId: partner.partnerId ?? partner.id,
       paymentId: payment.id,
       saleAmountCents,
-      commission,
+      correction,
     });
   } catch (error) {
     console.error("[carevalidate-payment]", error);

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAffiliateCode, parseTierFromCode } from "@/lib/affiliate/tiers";
-import { findPartnerByCode, movePartnerToTierGroup } from "@/lib/dub/partners";
+import { correctCommissionsForInvoice } from "@/lib/dub/commission-corrections";
 import {
   extractDiscountCodes,
   type ShopifyOrderPayload,
@@ -10,9 +9,10 @@ import { verifyShopifyWebhook } from "@/lib/utils/http";
 /**
  * POST /api/webhooks/shopify-order-complete
  *
- * Fires when a Shopify order is paid/completed.
- * Parses the affiliate discount tier from the code name and moves the partner
- * to the correct Dub commission group BEFORE Dub attributes the sale.
+ * Fires when a Shopify order is paid. Sets the Dub sale earnings from the
+ * affiliate code when it belongs to the partner Dub paid, otherwise from
+ * that commission's link key. Dub creates the sale on a queue, so a missing
+ * commission is left for the reconcile cron.
  */
 export async function POST(req: Request) {
   const rawBody = await req.text();
@@ -29,36 +29,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const discountCodes = extractDiscountCodes(order);
-  const affiliateCode = discountCodes.find((code) => isAffiliateCode(code));
-
-  if (!affiliateCode) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "no_affiliate_code" });
-  }
-
-  const tier = parseTierFromCode(affiliateCode);
-  if (!tier) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "unknown_tier" });
+  const confirmationNumber = order.confirmation_number?.trim();
+  if (!confirmationNumber) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: "no_confirmation_number",
+    });
   }
 
   try {
-    const partner = await findPartnerByCode(affiliateCode);
-    if (!partner) {
-      return NextResponse.json({ ok: true, skipped: true, reason: "partner_not_found" });
-    }
-
-    await movePartnerToTierGroup(partner, tier);
+    const correction = await correctCommissionsForInvoice({
+      invoiceId: confirmationNumber,
+      orderCodes: extractDiscountCodes(order),
+    });
 
     return NextResponse.json({
       ok: true,
-      code: affiliateCode,
-      tier,
-      partnerId: partner.partnerId ?? partner.id,
+      confirmationNumber,
+      correction,
     });
   } catch (error) {
     console.error("[shopify-order-complete]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Group move failed" },
+      { error: error instanceof Error ? error.message : "Commission correction failed" },
       { status: 500 },
     );
   }

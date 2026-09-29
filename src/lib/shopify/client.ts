@@ -150,9 +150,31 @@ export async function setDiscountActive(
 }
 
 export type ShopifyOrderPayload = {
+  confirmation_number?: string | null;
   discount_codes?: Array<{ code: string; amount?: string; type?: string }>;
   discount_applications?: Array<{ code?: string; title?: string; type?: string }>;
 };
+
+/** Discount codes on the Shopify order Dub stored under this confirmation number. */
+export async function getOrderDiscountCodesByConfirmation(
+  confirmationNumber: string,
+): Promise<string[] | null> {
+  const escaped = confirmationNumber.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const data = await shopifyGraphql<{
+    orders: { nodes: Array<{ discountCodes: string[] }> };
+  }>(
+    `query OrderByConfirmation($query: String!) {
+      orders(first: 1, query: $query) {
+        nodes { discountCodes }
+      }
+    }`,
+    { query: `confirmation_number:"${escaped}"` },
+  );
+
+  const order = data.orders.nodes[0];
+  if (!order) return null;
+  return order.discountCodes ?? [];
+}
 
 export function extractDiscountCodes(order: ShopifyOrderPayload): string[] {
   const codes = new Set<string>();

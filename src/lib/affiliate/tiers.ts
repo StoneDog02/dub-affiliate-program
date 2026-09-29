@@ -34,3 +34,8 @@ export function isAffiliateCode(code: string): boolean {
 export function tierGroupId(tier: TierKey): string {
   return TIER_CONFIG[tier].dubGroupId();
 }
+
+/** Single group every partner stays in. A missed correction pays this rate (20%). */
+export function homeGroupId(): string {
+  return tierGroupId("10");
+}
