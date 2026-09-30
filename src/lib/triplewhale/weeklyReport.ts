@@ -1,8 +1,8 @@
 import {
-  ORDERS_SUMMARY_SQL,
-  PLATFORM_ORDERS_SQL,
-  SOURCE_ORDERS_SQL,
-  SUBSCRIPTION_ORDERS_SQL,
+  ordersSummarySql,
+  platformOrdersSql,
+  sourceOrdersSql,
+  subscriptionOrdersSql,
 } from "@/lib/triplewhale/weeklyReportQueries";
 import {
   failureSlackPayload,
@@ -149,7 +149,12 @@ async function runQuery(name: string, query: string, period: WeekWindow): Promis
       }
 
       lastError = typeof body?.message === "string" ? publicError(body.message) : `HTTP ${res.status}`;
-      console.warn("[weekly-report] query failed", { query: name, status: res.status, attempt });
+      console.warn("[weekly-report] query failed", {
+        query: name,
+        status: res.status,
+        attempt,
+        message: lastError,
+      });
 
       if (res.status === 429) {
         sawRateLimit = true;
@@ -157,8 +162,8 @@ async function runQuery(name: string, query: string, period: WeekWindow): Promis
         continue;
       }
     } catch (error) {
-      lastError = error instanceof Error ? publicError(error.name) : "network error";
-      console.warn("[weekly-report] query failed", { query: name, attempt });
+      lastError = error instanceof Error ? publicError(error.message) : "network error";
+      console.warn("[weekly-report] query failed", { query: name, attempt, message: lastError });
     }
 
     if (!sawRateLimit && attempt >= 2) break;
@@ -353,15 +358,8 @@ const ORDER_FIELDS = [
   "returning_customer_revenue",
 ];
 
-function eventDay(row: Row): string {
-  return readString(row.event_date).slice(0, 10);
-}
-
-function rowsInWindow(rows: Row[], window: WeekWindow): Row[] {
-  return rows.filter((row) => {
-    const day = eventDay(row);
-    return day >= window.startDate && day <= window.endDate;
-  });
+function rowsForPeriod(rows: Row[], period: "current" | "prior"): Row[] {
+  return rows.filter((row) => readString(row.period) === period);
 }
 
 function sumFields(rows: Row[], fields: string[]): Row[] {
@@ -390,19 +388,19 @@ function groupSum(rows: Row[], keys: string[], fields: string[]): Row[] {
   return [...groups.values()];
 }
 
-function metricsForWindow(
-  window: WeekWindow,
+function metricsForPeriod(
+  period: "current" | "prior",
   orders: Row[],
   subscriptions: Row[],
   platforms: Row[],
   sources: Row[],
 ): WeekMetrics {
   return weekMetricsFromRows({
-    orders: sumFields(rowsInWindow(orders, window), ORDER_FIELDS),
-    subscriptions: sumFields(rowsInWindow(subscriptions, window), ["orders"]),
-    platforms: groupSum(rowsInWindow(platforms, window), ["platform"], ["order_revenue", "orders"]),
+    orders: sumFields(rowsForPeriod(orders, period), ORDER_FIELDS),
+    subscriptions: sumFields(rowsForPeriod(subscriptions, period), ["orders"]),
+    platforms: groupSum(rowsForPeriod(platforms, period), ["platform"], ["order_revenue", "orders"]),
     sources: groupSum(
-      rowsInWindow(sources, window),
+      rowsForPeriod(sources, period),
       ["channel", "utm_source", "utm_medium", "campaign_name"],
       ["order_revenue", "orders_quantity"],
     ),
@@ -412,20 +410,21 @@ function metricsForWindow(
 export async function buildWeeklyReport(now: Date): Promise<SlackPayload> {
   const weeks = completedWeeks(now);
   const period = { startDate: weeks.previous.startDate, endDate: weeks.current.endDate };
+  const currentStart = weeks.current.startDate;
   const [orders, subscriptions, platforms, sources] = await runQueriesInOrder(
     [
-      { name: "orders", query: ORDERS_SUMMARY_SQL },
-      { name: "subscriptions", query: SUBSCRIPTION_ORDERS_SQL },
-      { name: "platforms", query: PLATFORM_ORDERS_SQL },
-      { name: "sources", query: SOURCE_ORDERS_SQL },
+      { name: "orders", query: ordersSummarySql(currentStart) },
+      { name: "subscriptions", query: subscriptionOrdersSql(currentStart) },
+      { name: "platforms", query: platformOrdersSql(currentStart) },
+      { name: "sources", query: sourceOrdersSql(currentStart) },
     ],
     period,
   );
 
   return renderWeeklyReport({
     label: weeks.label,
-    current: metricsForWindow(weeks.current, orders, subscriptions, platforms, sources),
-    previous: metricsForWindow(weeks.previous, orders, subscriptions, platforms, sources),
+    current: metricsForPeriod("current", orders, subscriptions, platforms, sources),
+    previous: metricsForPeriod("prior", orders, subscriptions, platforms, sources),
     dashboardUrl: dashboardUrl(),
   });
 }

@@ -1,65 +1,119 @@
 /**
  * Triple Whale Data-Out SQL for the Monday leadership report.
  *
- * One request covers both weeks. The API period starts on the prior Monday
- * and ends on the current Sunday (@startDate / @endDate). Each query groups
- * by event_date so the caller can split those rows into the two weeks.
- * Do not interpolate dates into the SQL.
+ * One request covers both weeks. The API period is the prior Monday through
+ * the current Sunday (@startDate / @endDate). The inner query only reads raw
+ * columns and labels each row current or prior. The outer query groups by
+ * that label with one level of aggregates. AOV, shares, and week-over-week
+ * percentages are computed in TypeScript.
  *
- * `orders`, `new_customer_orders`, `returning_customer_orders`, and
- * `returning_customer_revenue` are Moby formula fields, not ClickHouse columns
- * (Data Dictionary → Derived). Order counts use `order_id`. New vs returning
- * uses the `is_new_customer` boolean. Result aliases stay the same so the
- * report code does not change.
+ * The week split uses event_date, the same column the API period filters.
+ * `orders` and the new/returning customer fields are Moby formulas, not
+ * columns, so counts use order_id and the is_new_customer boolean.
  */
 
-export const ORDERS_SUMMARY_SQL = `
+function reportDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error("Invalid report date");
+  }
+  return value;
+}
+
+function periodColumn(currentStart: string): string {
+  const day = reportDate(currentStart);
+  return `CASE WHEN event_date >= toDate('${day}') THEN 'current' ELSE 'prior' END AS period`;
+}
+
+export function ordersSummarySql(currentStart: string): string {
+  return `
+/* v2 */
 SELECT
-  event_date,
+  period,
+  count(distinct order_id) AS orders,
   sum(order_revenue) AS order_revenue,
   sum(shipping_price) AS shipping_price,
   sum(taxes) AS taxes,
-  count(distinct order_id) AS orders,
-  count(distinct CASE WHEN is_new_customer THEN order_id END) AS new_customer_orders,
-  count(distinct CASE WHEN NOT is_new_customer THEN order_id END) AS returning_customer_orders,
-  sum(CASE WHEN NOT is_new_customer THEN order_revenue ELSE 0 END) AS returning_customer_revenue
-FROM orders_table
-WHERE event_date BETWEEN @startDate AND @endDate
-GROUP BY event_date
+  uniqExactIf(order_id, is_new_customer) AS new_customer_orders,
+  uniqExactIf(order_id, NOT is_new_customer) AS returning_customer_orders,
+  sumIf(order_revenue, NOT is_new_customer) AS returning_customer_revenue
+FROM (
+  SELECT
+    order_id,
+    order_revenue,
+    shipping_price,
+    taxes,
+    is_new_customer,
+    ${periodColumn(currentStart)}
+  FROM orders_table
+  WHERE event_date BETWEEN @startDate AND @endDate
+) AS orders_raw
+GROUP BY period
 `.trim();
+}
 
-export const SUBSCRIPTION_ORDERS_SQL = `
+export function subscriptionOrdersSql(currentStart: string): string {
+  return `
+/* v2 */
 SELECT
-  event_date,
+  period,
   count(distinct order_id) AS orders
-FROM orders_table
-WHERE event_date BETWEEN @startDate AND @endDate
-  AND is_subscription_order = true
-GROUP BY event_date
+FROM (
+  SELECT
+    order_id,
+    ${periodColumn(currentStart)}
+  FROM orders_table
+  WHERE event_date BETWEEN @startDate AND @endDate
+    AND is_subscription_order = true
+) AS subscription_orders_raw
+GROUP BY period
 `.trim();
+}
 
-export const PLATFORM_ORDERS_SQL = `
+export function platformOrdersSql(currentStart: string): string {
+  return `
+/* v2 */
 SELECT
-  event_date,
+  period,
   platform,
   sum(order_revenue) AS order_revenue,
   count(distinct order_id) AS orders
-FROM orders_table
-WHERE event_date BETWEEN @startDate AND @endDate
-GROUP BY event_date, platform
+FROM (
+  SELECT
+    order_id,
+    order_revenue,
+    platform,
+    ${periodColumn(currentStart)}
+  FROM orders_table
+  WHERE event_date BETWEEN @startDate AND @endDate
+) AS platform_orders_raw
+GROUP BY period, platform
 `.trim();
+}
 
-export const SOURCE_ORDERS_SQL = `
+export function sourceOrdersSql(currentStart: string): string {
+  return `
+/* v2 */
 SELECT
-  event_date,
+  period,
   channel,
   utm_source,
   utm_medium,
   campaign_name,
   sum(order_revenue) AS order_revenue,
   sum(orders_quantity) AS orders_quantity
-FROM pixel_orders_table
-WHERE event_date BETWEEN @startDate AND @endDate
-  AND model = 'Triple Attribution'
-GROUP BY event_date, channel, utm_source, utm_medium, campaign_name
+FROM (
+  SELECT
+    order_revenue,
+    orders_quantity,
+    channel,
+    utm_source,
+    utm_medium,
+    campaign_name,
+    ${periodColumn(currentStart)}
+  FROM pixel_orders_table
+  WHERE event_date BETWEEN @startDate AND @endDate
+    AND model = 'Triple Attribution'
+) AS source_orders_raw
+GROUP BY period, channel, utm_source, utm_medium, campaign_name
 `.trim();
+}
