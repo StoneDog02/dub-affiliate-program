@@ -8,6 +8,7 @@ import {
 } from "@/lib/triplewhale/weeklyReport";
 
 export const dynamic = "force-dynamic";
+/** Pro plan function limit. Four sequential Triple Whale calls fit inside this. */
 export const maxDuration = 60;
 
 function authorized(req: Request): boolean {
@@ -46,18 +47,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, skipped: true });
   }
 
+  const started = Date.now();
   try {
     const payload = await buildWeeklyReport(new Date());
-    if (!shouldPost) return NextResponse.json(payload);
+    if (!shouldPost) {
+      console.log("[weekly-report] finished", { ms: Date.now() - started });
+      return NextResponse.json(payload);
+    }
 
     await postSlackPayload(payload);
+    console.log("[weekly-report] finished", { ms: Date.now() - started });
     if (preview) return NextResponse.json({ posted: true, ...payload });
     return NextResponse.json({ ok: true, posted: true });
   } catch (error) {
-    console.error(
-      "[weekly-report]",
-      error instanceof Error ? error.message : "failed",
-    );
+    console.error("[weekly-report]", error instanceof Error ? error.message : "failed", {
+      ms: Date.now() - started,
+    });
 
     if (shouldPost) {
       try {

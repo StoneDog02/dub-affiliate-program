@@ -88,18 +88,37 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const QUERY_PAUSE_MS = 1000;
+const RATE_LIMIT_BACKOFF_MS = [5_000, 15_000, 30_000];
+
+/** Retry-After is seconds, or an HTTP date. Missing or unreadable falls through. */
+function retryAfterMs(res: Response): number | null {
+  const header = res.headers.get("retry-after")?.trim();
+  if (!header) return null;
+
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 30_000);
+
+  const when = Date.parse(header);
+  if (Number.isNaN(when)) return null;
+  return Math.min(Math.max(0, when - Date.now()), 30_000);
+}
+
 /**
- * One attempt plus two retries. Logs the query name and status only.
+ * Non-429 failures: one try plus two retries (500ms, then 1500ms).
+ * 429: up to 4 attempts, waiting on Retry-After or 5s / 15s / 30s.
  */
 async function runQuery(name: string, query: string, period: WeekWindow): Promise<Row[]> {
   const apiKey = requiredEnv("TRIPLEWHALE_READ_API_KEY");
   const shopId = process.env.TRIPLEWHALE_SHOP_ID?.trim() || SHOP_ID_DEFAULT;
   let lastError = "query failed";
+  let nextWait = 0;
+  let sawRateLimit = false;
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     if (attempt > 0) {
-      await sleep(attempt === 1 ? 500 : 1500);
       console.warn("[weekly-report] retrying", { query: name, attempt });
+      await sleep(nextWait);
     }
 
     try {
@@ -125,21 +144,41 @@ async function runQuery(name: string, query: string, period: WeekWindow): Promis
         data?: unknown;
       } | null;
 
-      if (!res.ok || !body || body.success === false || !Array.isArray(body.data)) {
-        lastError =
-          typeof body?.message === "string" ? publicError(body.message) : `HTTP ${res.status}`;
-        console.warn("[weekly-report] query failed", { query: name, status: res.status, attempt });
-        continue;
+      if (res.ok && body && body.success !== false && Array.isArray(body.data)) {
+        return body.data as Row[];
       }
 
-      return body.data as Row[];
+      lastError = typeof body?.message === "string" ? publicError(body.message) : `HTTP ${res.status}`;
+      console.warn("[weekly-report] query failed", { query: name, status: res.status, attempt });
+
+      if (res.status === 429) {
+        sawRateLimit = true;
+        nextWait = retryAfterMs(res) ?? RATE_LIMIT_BACKOFF_MS[Math.min(attempt, RATE_LIMIT_BACKOFF_MS.length - 1)];
+        continue;
+      }
     } catch (error) {
       lastError = error instanceof Error ? publicError(error.name) : "network error";
       console.warn("[weekly-report] query failed", { query: name, attempt });
     }
+
+    if (!sawRateLimit && attempt >= 2) break;
+    if (!sawRateLimit) nextWait = attempt === 0 ? 500 : 1500;
   }
 
   throw new Error(`${name} failed: ${lastError}`);
+}
+
+async function runQueriesInOrder(
+  jobs: Array<{ name: string; query: string }>,
+  period: WeekWindow,
+): Promise<Row[][]> {
+  const results: Row[][] = [];
+  for (let index = 0; index < jobs.length; index++) {
+    if (index > 0) await sleep(QUERY_PAUSE_MS);
+    const job = jobs[index];
+    results.push(await runQuery(job.name, job.query, period));
+  }
+  return results;
 }
 
 function normalizeToken(value: string): string {
@@ -304,28 +343,89 @@ export function weekMetricsFromRows(input: {
   };
 }
 
-async function loadWeek(period: WeekWindow, suffix: string): Promise<WeekMetrics> {
-  const [orders, subscriptions, platforms, sources] = await Promise.all([
-    runQuery(`orders${suffix}`, ORDERS_SUMMARY_SQL, period),
-    runQuery(`subscriptions${suffix}`, SUBSCRIPTION_ORDERS_SQL, period),
-    runQuery(`platforms${suffix}`, PLATFORM_ORDERS_SQL, period),
-    runQuery(`sources${suffix}`, SOURCE_ORDERS_SQL, period),
-  ]);
+const ORDER_FIELDS = [
+  "order_revenue",
+  "shipping_price",
+  "taxes",
+  "orders",
+  "new_customer_orders",
+  "returning_customer_orders",
+  "returning_customer_revenue",
+];
 
-  return weekMetricsFromRows({ orders, subscriptions, platforms, sources });
+function eventDay(row: Row): string {
+  return readString(row.event_date).slice(0, 10);
+}
+
+function rowsInWindow(rows: Row[], window: WeekWindow): Row[] {
+  return rows.filter((row) => {
+    const day = eventDay(row);
+    return day >= window.startDate && day <= window.endDate;
+  });
+}
+
+function sumFields(rows: Row[], fields: string[]): Row[] {
+  if (rows.length === 0) return [];
+  const total: Row = {};
+  for (const field of fields) total[field] = 0;
+  for (const row of rows) {
+    for (const field of fields) total[field] = readNumber(total[field]) + readNumber(row[field]);
+  }
+  return [total];
+}
+
+function groupSum(rows: Row[], keys: string[], fields: string[]): Row[] {
+  const groups = new Map<string, Row>();
+  for (const row of rows) {
+    const id = keys.map((key) => readString(row[key])).join("\u0000");
+    let group = groups.get(id);
+    if (!group) {
+      group = {};
+      for (const key of keys) group[key] = readString(row[key]);
+      for (const field of fields) group[field] = 0;
+      groups.set(id, group);
+    }
+    for (const field of fields) group[field] = readNumber(group[field]) + readNumber(row[field]);
+  }
+  return [...groups.values()];
+}
+
+function metricsForWindow(
+  window: WeekWindow,
+  orders: Row[],
+  subscriptions: Row[],
+  platforms: Row[],
+  sources: Row[],
+): WeekMetrics {
+  return weekMetricsFromRows({
+    orders: sumFields(rowsInWindow(orders, window), ORDER_FIELDS),
+    subscriptions: sumFields(rowsInWindow(subscriptions, window), ["orders"]),
+    platforms: groupSum(rowsInWindow(platforms, window), ["platform"], ["order_revenue", "orders"]),
+    sources: groupSum(
+      rowsInWindow(sources, window),
+      ["channel", "utm_source", "utm_medium", "campaign_name"],
+      ["order_revenue", "orders_quantity"],
+    ),
+  });
 }
 
 export async function buildWeeklyReport(now: Date): Promise<SlackPayload> {
   const weeks = completedWeeks(now);
-  const [current, previous] = await Promise.all([
-    loadWeek(weeks.current, ""),
-    loadWeek(weeks.previous, "-prior"),
-  ]);
+  const period = { startDate: weeks.previous.startDate, endDate: weeks.current.endDate };
+  const [orders, subscriptions, platforms, sources] = await runQueriesInOrder(
+    [
+      { name: "orders", query: ORDERS_SUMMARY_SQL },
+      { name: "subscriptions", query: SUBSCRIPTION_ORDERS_SQL },
+      { name: "platforms", query: PLATFORM_ORDERS_SQL },
+      { name: "sources", query: SOURCE_ORDERS_SQL },
+    ],
+    period,
+  );
 
   return renderWeeklyReport({
     label: weeks.label,
-    current,
-    previous,
+    current: metricsForWindow(weeks.current, orders, subscriptions, platforms, sources),
+    previous: metricsForWindow(weeks.previous, orders, subscriptions, platforms, sources),
     dashboardUrl: dashboardUrl(),
   });
 }
