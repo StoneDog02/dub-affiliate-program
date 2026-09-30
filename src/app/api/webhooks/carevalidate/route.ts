@@ -11,13 +11,37 @@ import {
   recordCareValidateSale,
 } from "@/lib/dub/commissions";
 import { findPartnerByCode } from "@/lib/dub/partners";
+import { forwardToTripleWhale } from "@/lib/triplewhale/tripleWhaleTelehealth";
 import { verifyCareValidateWebhook } from "@/lib/utils/http";
+
+/**
+ * Paid CareValidate payments go to Triple Whale. A failure here must not
+ * change the webhook acknowledgement.
+ */
+async function forwardPaidCareValidatePayment(
+  body: CareValidateWebhookPayload,
+): Promise<void> {
+  if (body.event !== "PAYMENT_COMPLETED" || body.payload?.payment?.status !== "PAID") {
+    return;
+  }
+
+  try {
+    await forwardToTripleWhale(body);
+  } catch (error) {
+    console.error(
+      "[tw-telehealth] forward failed:",
+      error instanceof Error ? error.message : "unknown",
+    );
+  }
+}
 
 /**
  * POST /api/webhooks/carevalidate
  *
  * CareValidate PAYMENT_COMPLETED → affiliate promo lookup → Dub commission.
  * The sale is tied to that promo's link, then earnings are set from the code.
+ * Triple Whale is forwarded for every PAID payment: immediately when there is
+ * no Dub sale, and only after commission correction when a sale is recorded.
  */
 export async function POST(req: Request) {
   if (!verifyCareValidateWebhook(req)) {
@@ -52,11 +76,13 @@ export async function POST(req: Request) {
 
   const affiliateCode = extractAffiliatePromoCode(body);
   if (!affiliateCode) {
+    await forwardPaidCareValidatePayment(body);
     return NextResponse.json({ ok: true, skipped: true, reason: "no_affiliate_code" });
   }
 
   const saleAmountCents = paymentAmountToCents(payment.amount);
   if (!saleAmountCents) {
+    await forwardPaidCareValidatePayment(body);
     return NextResponse.json({ ok: true, skipped: true, reason: "invalid_amount" });
   }
 
@@ -69,6 +95,7 @@ export async function POST(req: Request) {
   try {
     const partner = await findPartnerByCode(affiliateCode);
     if (!partner) {
+      await forwardPaidCareValidatePayment(body);
       return NextResponse.json({ ok: true, skipped: true, reason: "partner_not_found" });
     }
 
@@ -99,6 +126,8 @@ export async function POST(req: Request) {
     if (correction.action === "pending") {
       return NextResponse.json({ error: "Commission not ready" }, { status: 500 });
     }
+
+    await forwardPaidCareValidatePayment(body);
 
     return NextResponse.json({
       ok: true,
