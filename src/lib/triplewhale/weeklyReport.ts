@@ -197,7 +197,7 @@ function normalizeToken(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-function bucketFor(row: SourceRow): Bucket {
+function bucketFor(row: SourceRow): Bucket | "other" {
   const source = normalizeToken(row.utmSource);
   const channel = normalizeToken(row.channel);
   const medium = normalizeToken(row.utmMedium);
@@ -214,7 +214,26 @@ function bucketFor(row: SourceRow): Bucket {
     return "emailSms";
   }
   if (channel.endsWith("-ads") || PAID_MEDIUMS.has(medium)) return "paid";
-  return "directOrganic";
+  if (isDirectOrganicChannel(channel)) return "directOrganic";
+  return "other";
+}
+
+/** Pixel channel is Direct or an organic source. Blank and excluded channels are not. */
+function isDirectOrganicChannel(channel: string): boolean {
+  if (isUnattributedChannel(channel)) return false;
+  if (channel === "direct" || channel.startsWith("direct-")) return true;
+  return channel.includes("organic") || channel === "seo";
+}
+
+function isUnattributedChannel(channel: string): boolean {
+  return (
+    !channel ||
+    channel === "unattributed" ||
+    channel === "excluded" ||
+    channel === "non-attributed" ||
+    channel === "nonattributed" ||
+    channel === "none"
+  );
 }
 
 /** Campaign labels only. Drops anything that looks like an email address. */
@@ -370,12 +389,23 @@ export function weekMetricsFromRows(input: {
     directOrganic: { revenue: 0, orders: 0, rows: [] },
   };
 
+  let pixelRevenue = 0;
+  let unattributedPixelRevenue = 0;
   for (const row of sourceRows) {
-    const bucket = buckets[bucketFor(row)];
+    pixelRevenue += row.revenue;
+    const bucketName = bucketFor(row);
+    if (bucketName === "other") {
+      if (isUnattributedChannel(normalizeToken(row.channel))) unattributedPixelRevenue += row.revenue;
+      continue;
+    }
+    const bucket = buckets[bucketName];
     bucket.revenue += row.revenue;
     bucket.orders += row.orders;
     bucket.rows.push(row);
   }
+  const missingFromPixel = Math.max(0, orderRevenue - pixelRevenue);
+  const unattributedRevenue = missingFromPixel + unattributedPixelRevenue;
+  const unattributedShown = unattributedRevenue > 0.005 ? unattributedRevenue : 0;
 
   const slice = (orders: number, revenue: number) =>
     orders > 0 ? { orders, revenue } : { orders: null, revenue: null };
@@ -408,6 +438,7 @@ export function weekMetricsFromRows(input: {
     ),
     emailSms: sourceMetric(buckets.emailSms.revenue, buckets.emailSms.orders, orderRevenue, null),
     paid: sourceMetric(buckets.paid.revenue, buckets.paid.orders, orderRevenue, null),
+    unattributed: sourceMetric(unattributedShown, 0, orderRevenue, null),
   };
 }
 

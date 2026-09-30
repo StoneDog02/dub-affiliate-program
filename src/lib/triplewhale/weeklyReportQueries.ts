@@ -53,7 +53,7 @@ GROUP BY period
 
 export function subscriptionOrdersSql(currentStart: string): string {
   return `
-/* v2 */
+/* v3 */
 SELECT
   period,
   count(distinct order_id) AS order_count
@@ -63,7 +63,16 @@ FROM (
     ${periodColumn(currentStart)}
   FROM orders_table
   WHERE event_date BETWEEN @startDate AND @endDate
-    AND is_subscription_order = true
+    AND (
+      is_subscription_order = true
+      OR ifNull(source_name, '') ILIKE '%subscription_contract%'
+      OR has(tags, 'Subscription')
+      OR has(tags, 'Subscription Recurring Order')
+      OR has(tags, 'Subscription First Order')
+      OR has(tags, 'Loop Subscription')
+      OR has(tags, 'loop-subscription')
+      OR has(tags, 'loop_subscription')
+    )
 ) AS subscription_orders_raw
 GROUP BY period
 `.trim();

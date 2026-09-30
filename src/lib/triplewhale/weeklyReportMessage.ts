@@ -34,6 +34,7 @@ export type WeekMetrics = {
   affiliate: SourceMetric;
   emailSms: SourceMetric;
   paid: SourceMetric;
+  unattributed: SourceMetric;
 };
 
 type Mrkdwn = { type: "mrkdwn"; text: string };
@@ -61,30 +62,34 @@ export type SlackPayload = {
   unfurl_media: false;
 };
 
+type MetricKind = "money" | "count" | "percent";
+
 type LookMetric = {
   label: string;
+  kind: MetricKind;
   current: number | null;
   previous: number | null;
 };
 
-const WORTH_A_LOOK: Array<{ label: string; key: keyof WeekMetrics }> = [
-  { label: "Revenue", key: "revenue" },
-  { label: "Orders", key: "orders" },
-  { label: "AOV", key: "aov" },
-  { label: "New customers", key: "newCustomers" },
-  { label: "Telehealth revenue", key: "telehealthRevenue" },
-  { label: "Supplements revenue", key: "supplementsRevenue" },
-  { label: "Autoship orders", key: "autoshipOrders" },
-  { label: "Returning-customer revenue", key: "returningRevenuePct" },
-  { label: "New orders", key: "newOrders" },
-  { label: "Returning orders", key: "returningOrders" },
+const WORTH_A_LOOK: Array<{ label: string; key: keyof WeekMetrics; kind: MetricKind }> = [
+  { label: "Revenue", key: "revenue", kind: "money" },
+  { label: "Orders", key: "orders", kind: "count" },
+  { label: "AOV (before shipping & tax)", key: "aov", kind: "money" },
+  { label: "New customers", key: "newCustomers", kind: "count" },
+  { label: "Telehealth revenue", key: "telehealthRevenue", kind: "money" },
+  { label: "Supplements revenue", key: "supplementsRevenue", kind: "money" },
+  { label: "Autoship orders", key: "autoshipOrders", kind: "count" },
+  { label: "Returning-customer revenue", key: "returningRevenuePct", kind: "percent" },
+  { label: "New orders", key: "newOrders", kind: "count" },
+  { label: "Returning orders", key: "returningOrders", kind: "count" },
 ];
 
-const SOURCE_LOOK: Array<{ label: string; key: keyof WeekMetrics }> = [
-  { label: "Direct / organic revenue", key: "directOrganic" },
-  { label: "Affiliate revenue", key: "affiliate" },
-  { label: "Email / SMS revenue", key: "emailSms" },
-  { label: "Paid revenue", key: "paid" },
+const SOURCE_LOOK: Array<{ label: string; key: keyof WeekMetrics; kind: MetricKind }> = [
+  { label: "Direct / organic revenue", key: "directOrganic", kind: "money" },
+  { label: "Affiliate revenue", key: "affiliate", kind: "money" },
+  { label: "Email / SMS revenue", key: "emailSms", kind: "money" },
+  { label: "Paid revenue", key: "paid", kind: "money" },
+  { label: "Unattributed revenue", key: "unattributed", kind: "money" },
 ];
 
 function section(text: string): SlackBlock {
@@ -127,18 +132,46 @@ function lookMetrics(current: WeekMetrics, previous: WeekMetrics): LookMetric[] 
   const specs = [...WORTH_A_LOOK, ...SOURCE_LOOK];
   return specs.map((spec) => ({
     label: spec.label,
+    kind: spec.kind,
     current: metricValue(current, spec.key),
     previous: metricValue(previous, spec.key),
   }));
 }
 
+function formatLookValue(kind: MetricKind, value: number): string {
+  if (kind === "count") return formatCount(value);
+  if (kind === "percent") return formatPercent(value);
+  return formatMoney(value);
+}
+
+function formatLookChange(change: number): string {
+  const pct = Math.abs(change) * 100;
+  const rounded = Math.round(pct * 10) / 10;
+  const text = Math.abs(rounded - Math.round(rounded)) < 0.001 ? String(Math.round(rounded)) : rounded.toFixed(1);
+  if (change === 0) return "0%";
+  return `${change > 0 ? "▲" : "▼"}${text}%`;
+}
+
+/** Prior counts under 3, dollars under $3, or rates under 3 percentage points. */
+function priorTooSmall(kind: MetricKind, previous: number): boolean {
+  if (kind === "percent") return previous * 100 < 3;
+  return previous < 3;
+}
+
 export function worthALook(current: WeekMetrics, previous: WeekMetrics): string[] {
   return lookMetrics(current, previous)
     .map((metric, index) => ({ metric, index, change: percentChange(metric.current, metric.previous) }))
-    .filter((item): item is { metric: LookMetric; index: number; change: number } => item.change !== null)
+    .filter((item): item is { metric: LookMetric; index: number; change: number } => {
+      if (item.change === null || item.metric.previous === null || item.metric.current === null) return false;
+      return !priorTooSmall(item.metric.kind, item.metric.previous);
+    })
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change) || a.index - b.index)
     .slice(0, 2)
-    .map((item) => `${item.metric.label} ${formatChange(item.change)}`);
+    .map((item) => {
+      const prior = formatLookValue(item.metric.kind, item.metric.previous as number);
+      const currentValue = formatLookValue(item.metric.kind, item.metric.current as number);
+      return `${item.metric.label} ${prior} → ${currentValue} (${formatLookChange(item.change)})`;
+    });
 }
 
 function moneyLine(label: string, revenue: number | null, extra: string[]): string {
@@ -190,7 +223,9 @@ export function renderWeeklyReport(input: {
     const aov = current.aov === null ? NO_DATA : `*${formatMoney(current.aov)}*`;
     const newcomers = current.newCustomers === null ? NO_DATA : `*${formatCount(current.newCustomers)}*`;
     blocks.push(
-      section(`Orders *${formatCount(current.orders)}*  ·  AOV ${aov}  ·  New customers ${newcomers}`),
+      section(
+        `Orders *${formatCount(current.orders)}*  ·  AOV (before shipping & tax) ${aov}  ·  New customers ${newcomers}`,
+      ),
     );
   }
 
@@ -230,7 +265,13 @@ export function renderWeeklyReport(input: {
     );
   }
 
-  const sources = [current.directOrganic, current.affiliate, current.emailSms, current.paid];
+  const sources = [
+    current.directOrganic,
+    current.affiliate,
+    current.emailSms,
+    current.paid,
+    current.unattributed,
+  ];
   const sourceBody = sources.every((source) => source.revenue === null)
     ? NO_DATA
     : [
@@ -238,6 +279,7 @@ export function renderWeeklyReport(input: {
         sourceLine("Affiliate", current.affiliate),
         sourceLine("Email / SMS", current.emailSms),
         sourceLine("Paid", current.paid),
+        sourceLine("Unattributed", current.unattributed),
       ].join("\n");
 
   blocks.push(section(`*Where customers came from*\n${sourceBody}`));
