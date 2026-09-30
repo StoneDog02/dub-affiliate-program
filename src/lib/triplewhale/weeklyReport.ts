@@ -272,16 +272,16 @@ export function weekMetricsFromRows(input: {
 }): WeekMetrics {
   const orders = oneRow("orders", input.orders);
   const subscriptions = oneRow("subscriptions", input.subscriptions);
-  const orderCount = readNumber(orders.orders);
-  const orderRevenue = readNumber(orders.order_revenue);
+  const orderCount = readNumber(orders.order_count);
+  const orderRevenue = readNumber(orders.revenue_total);
   const hasOrders = orderCount > 0;
 
   const platformTotal = (name: string) =>
     input.platforms.reduce<{ revenue: number; orders: number }>(
       (sum, row) => {
         if (readString(row.platform).trim().toLowerCase() !== name) return sum;
-        sum.revenue += readNumber(row.order_revenue);
-        sum.orders += readNumber(row.orders);
+        sum.revenue += readNumber(row.revenue_total);
+        sum.orders += readNumber(row.order_count);
         return sum;
       },
       { revenue: 0, orders: 0 },
@@ -289,15 +289,15 @@ export function weekMetricsFromRows(input: {
 
   const telehealth = platformTotal("carevalidate");
   const supplements = platformTotal("shopify");
-  const autoshipOrders = readNumber(subscriptions.orders);
+  const autoshipOrders = readNumber(subscriptions.order_count);
 
   const sourceRows: SourceRow[] = input.sources.map((row) => ({
     channel: readString(row.channel),
     utmSource: readString(row.utm_source),
     utmMedium: readString(row.utm_medium),
     campaignName: readString(row.campaign_name),
-    revenue: readNumber(row.order_revenue),
-    orders: readNumber(row.orders_quantity),
+    revenue: readNumber(row.revenue_total),
+    orders: readNumber(row.quantity_total),
   }));
 
   const buckets: Record<Bucket, { revenue: number; orders: number; rows: SourceRow[] }> = {
@@ -324,7 +324,7 @@ export function weekMetricsFromRows(input: {
     revenue: hasOrders ? orderRevenue : null,
     orders: hasOrders ? orderCount : null,
     aov: hasOrders
-      ? (orderRevenue - readNumber(orders.shipping_price) - readNumber(orders.taxes)) / orderCount
+      ? (orderRevenue - readNumber(orders.shipping_total) - readNumber(orders.tax_total)) / orderCount
       : null,
     newCustomers: hasOrders ? readNumber(orders.new_customer_orders) : null,
     telehealthRevenue: telehealthSlice.revenue,
@@ -349,10 +349,10 @@ export function weekMetricsFromRows(input: {
 }
 
 const ORDER_FIELDS = [
-  "order_revenue",
-  "shipping_price",
-  "taxes",
-  "orders",
+  "revenue_total",
+  "shipping_total",
+  "tax_total",
+  "order_count",
   "new_customer_orders",
   "returning_customer_orders",
   "returning_customer_revenue",
@@ -397,12 +397,12 @@ function metricsForPeriod(
 ): WeekMetrics {
   return weekMetricsFromRows({
     orders: sumFields(rowsForPeriod(orders, period), ORDER_FIELDS),
-    subscriptions: sumFields(rowsForPeriod(subscriptions, period), ["orders"]),
-    platforms: groupSum(rowsForPeriod(platforms, period), ["platform"], ["order_revenue", "orders"]),
+    subscriptions: sumFields(rowsForPeriod(subscriptions, period), ["order_count"]),
+    platforms: groupSum(rowsForPeriod(platforms, period), ["platform"], ["revenue_total", "order_count"]),
     sources: groupSum(
       rowsForPeriod(sources, period),
       ["channel", "utm_source", "utm_medium", "campaign_name"],
-      ["order_revenue", "orders_quantity"],
+      ["revenue_total", "quantity_total"],
     ),
   });
 }

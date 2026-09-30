@@ -29,10 +29,10 @@ export function ordersSummarySql(currentStart: string): string {
 /* v2 */
 SELECT
   period,
-  count(distinct order_id) AS orders,
-  sum(order_revenue) AS order_revenue,
-  sum(shipping_price) AS shipping_price,
-  sum(taxes) AS taxes,
+  count(distinct order_id) AS order_count,
+  sum(order_revenue) AS revenue_total,
+  sum(shipping_price) AS shipping_total,
+  sum(taxes) AS tax_total,
   uniqExactIf(order_id, is_new_customer) AS new_customer_orders,
   uniqExactIf(order_id, NOT is_new_customer) AS returning_customer_orders,
   sumIf(order_revenue, NOT is_new_customer) AS returning_customer_revenue
@@ -56,7 +56,7 @@ export function subscriptionOrdersSql(currentStart: string): string {
 /* v2 */
 SELECT
   period,
-  count(distinct order_id) AS orders
+  count(distinct order_id) AS order_count
 FROM (
   SELECT
     order_id,
@@ -75,8 +75,8 @@ export function platformOrdersSql(currentStart: string): string {
 SELECT
   period,
   platform,
-  sum(order_revenue) AS order_revenue,
-  count(distinct order_id) AS orders
+  sum(order_revenue) AS revenue_total,
+  count(distinct order_id) AS order_count
 FROM (
   SELECT
     order_id,
@@ -99,8 +99,8 @@ SELECT
   utm_source,
   utm_medium,
   campaign_name,
-  sum(order_revenue) AS order_revenue,
-  sum(orders_quantity) AS orders_quantity
+  sum(order_revenue) AS revenue_total,
+  sum(orders_quantity) AS quantity_total
 FROM (
   SELECT
     order_revenue,
