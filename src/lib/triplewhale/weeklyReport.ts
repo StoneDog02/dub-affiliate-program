@@ -138,22 +138,29 @@ async function runQuery(name: string, query: string, period: WeekWindow): Promis
         signal: AbortSignal.timeout(12_000),
       });
 
-      const body = (await res.json().catch(() => null)) as {
-        success?: boolean;
-        message?: unknown;
-        data?: unknown;
-      } | null;
-
-      if (res.ok && body && body.success !== false && Array.isArray(body.data)) {
-        return body.data as Row[];
+      const text = await res.text();
+      let payload: unknown = null;
+      if (text) {
+        try {
+          payload = JSON.parse(text) as unknown;
+        } catch {
+          payload = null;
+        }
       }
 
-      lastError = typeof body?.message === "string" ? publicError(body.message) : `HTTP ${res.status}`;
+      if (res.ok) {
+        const rows = rowsFromSqlResponse(payload);
+        if (rows) return rows;
+      }
+
+      const detail = failureMessage(payload);
+      const snippet = responseSnippet(text);
+      lastError = detail ? publicError(detail) : snippet || `HTTP ${res.status}`;
       console.warn("[weekly-report] query failed", {
         query: name,
         status: res.status,
         attempt,
-        message: lastError,
+        message: snippet || lastError,
       });
 
       if (res.status === 429) {
@@ -227,6 +234,62 @@ export function partnerLabel(name: string): string | null {
 
 function publicError(message: string): string {
   return message.replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[redacted]").slice(0, 300);
+}
+
+function responseSnippet(text: string): string {
+  return text.replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[redacted]").slice(0, 500);
+}
+
+type SqlPayload = {
+  success?: boolean;
+  message?: unknown;
+  error?: unknown;
+  exception?: unknown;
+  data?: unknown;
+};
+
+function asRows(value: unknown): Row[] | null {
+  return Array.isArray(value) ? (value as Row[]) : null;
+}
+
+/** Error text from a 200 body. Null when the payload is not reporting a failure. */
+function failureMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const body = payload as SqlPayload;
+  if (typeof body.error === "string" && body.error.trim()) return body.error;
+  if (body.error && typeof body.error === "object") {
+    const nested = body.error as { message?: unknown };
+    if (typeof nested.message === "string" && nested.message.trim()) return nested.message;
+  }
+  if (typeof body.exception === "string" && body.exception.trim()) return body.exception;
+  if (body.success === false) {
+    return typeof body.message === "string" && body.message.trim() ? body.message : "Query failed";
+  }
+  return null;
+}
+
+/**
+ * Documented success shape is `{ success, message, data: Row[] }`.
+ * An empty `data` array, or `data: null` on success, is a valid empty result.
+ * Some responses are the row array itself.
+ */
+function rowsFromSqlResponse(payload: unknown): Row[] | null {
+  if (Array.isArray(payload)) return payload as Row[];
+  if (!payload || typeof payload !== "object") return null;
+  if (failureMessage(payload)) return null;
+
+  const body = payload as SqlPayload;
+  const dataRows = asRows(body.data);
+  if (dataRows) return dataRows;
+
+  if (body.data && typeof body.data === "object") {
+    const nested = body.data as { rows?: unknown; data?: unknown };
+    const nestedRows = asRows(nested.rows) ?? asRows(nested.data);
+    if (nestedRows) return nestedRows;
+  }
+
+  if (body.success === true && body.data == null) return [];
+  return null;
 }
 
 function emptySource(): SourceMetric {
