@@ -34,6 +34,7 @@ export type WeekMetrics = {
   affiliate: SourceMetric;
   emailSms: SourceMetric;
   paid: SourceMetric;
+  other: SourceMetric;
   unattributed: SourceMetric;
 };
 
@@ -89,7 +90,7 @@ const SOURCE_LOOK: Array<{ label: string; key: keyof WeekMetrics; kind: MetricKi
   { label: "Affiliate revenue", key: "affiliate", kind: "money" },
   { label: "Email / SMS revenue", key: "emailSms", kind: "money" },
   { label: "Paid revenue", key: "paid", kind: "money" },
-  { label: "Unattributed revenue", key: "unattributed", kind: "money" },
+  { label: "Other revenue", key: "other", kind: "money" },
 ];
 
 function section(text: string): SlackBlock {
@@ -270,6 +271,7 @@ export function renderWeeklyReport(input: {
     current.affiliate,
     current.emailSms,
     current.paid,
+    current.other,
     current.unattributed,
   ];
   const sourceBody = sources.every((source) => source.revenue === null)
@@ -279,6 +281,7 @@ export function renderWeeklyReport(input: {
         sourceLine("Affiliate", current.affiliate),
         sourceLine("Email / SMS", current.emailSms),
         sourceLine("Paid", current.paid),
+        sourceLine("Other", current.other),
         sourceLine("Unattributed", current.unattributed),
       ].join("\n");
 

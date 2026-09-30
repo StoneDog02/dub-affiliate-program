@@ -389,13 +389,19 @@ export function weekMetricsFromRows(input: {
     directOrganic: { revenue: 0, orders: 0, rows: [] },
   };
 
+  const other: { revenue: number; orders: number } = { revenue: 0, orders: 0 };
   let pixelRevenue = 0;
   let unattributedPixelRevenue = 0;
   for (const row of sourceRows) {
     pixelRevenue += row.revenue;
     const bucketName = bucketFor(row);
     if (bucketName === "other") {
-      if (isUnattributedChannel(normalizeToken(row.channel))) unattributedPixelRevenue += row.revenue;
+      if (isUnattributedChannel(normalizeToken(row.channel))) {
+        unattributedPixelRevenue += row.revenue;
+      } else {
+        other.revenue += row.revenue;
+        other.orders += row.orders;
+      }
       continue;
     }
     const bucket = buckets[bucketName];
@@ -438,6 +444,7 @@ export function weekMetricsFromRows(input: {
     ),
     emailSms: sourceMetric(buckets.emailSms.revenue, buckets.emailSms.orders, orderRevenue, null),
     paid: sourceMetric(buckets.paid.revenue, buckets.paid.orders, orderRevenue, null),
+    other: sourceMetric(other.revenue, other.orders, orderRevenue, null),
     unattributed: sourceMetric(unattributedShown, 0, orderRevenue, null),
   };
 }
