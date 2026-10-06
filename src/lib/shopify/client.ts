@@ -143,6 +143,9 @@ export async function setDiscountActive(
   );
 
   const result = data.discountCodeActivate ?? data.discountCodeDeactivate;
+  if (!result) {
+    throw new Error("Shopify returned no discount update result");
+  }
   const errors = result?.userErrors ?? [];
   if (errors.length > 0) {
     throw new Error(errors.map((e) => e.message).join(", "));

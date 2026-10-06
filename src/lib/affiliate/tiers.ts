@@ -2,9 +2,9 @@ import { env } from "@/lib/env";
 import type { TierConfig, TierKey } from "./types";
 
 export const TIER_CONFIG: Record<TierKey, TierConfig> = {
-  "10": { discount: 10, commission: 20, dubGroupId: env.dubGroupIdTierA },
-  "15": { discount: 15, commission: 15, dubGroupId: env.dubGroupIdTierB },
-  "20": { discount: 20, commission: 10, dubGroupId: env.dubGroupIdTierC },
+  "10": { discount: 10, commission: 25, dubGroupId: env.dubGroupIdTierA },
+  "15": { discount: 15, commission: 20, dubGroupId: env.dubGroupIdTierB },
+  "20": { discount: 20, commission: 15, dubGroupId: env.dubGroupIdTierC },
 };
 
 const LEGACY_TIER_PATTERN = /-(10|15|20)(?:-|$)/;
@@ -35,7 +35,7 @@ export function tierGroupId(tier: TierKey): string {
   return TIER_CONFIG[tier].dubGroupId();
 }
 
-/** Single group every partner stays in. A missed correction pays this rate (20%). */
+/** Single group every partner stays in. A missed correction pays this rate (25%). */
 export function homeGroupId(): string {
   return tierGroupId("10");
 }

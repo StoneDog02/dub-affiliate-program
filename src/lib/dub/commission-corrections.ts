@@ -1,4 +1,5 @@
 import type { AffiliateMetadata, TierKey } from "@/lib/affiliate/types";
+import { commissionRateForSale } from "@/lib/affiliate/commission-rates";
 import { parseTierFromCode, TIER_CONFIG } from "@/lib/affiliate/tiers";
 import { getOrderDiscountCodesByConfirmation } from "@/lib/shopify/client";
 import { dubFetch, getDubClient } from "./client";
@@ -91,8 +92,17 @@ export function decideCommissionTier(input: {
   return null;
 }
 
-export function targetEarningsCents(amountCents: number, tier: TierKey): number {
-  return Math.round((amountCents * TIER_CONFIG[tier].commission) / 100);
+export function targetEarningsCents(
+  amountCents: number,
+  tier: TierKey,
+  saleCreatedAt?: string,
+): number {
+  const commission = commissionRateForSale(
+    tier,
+    saleCreatedAt,
+    TIER_CONFIG[tier].commission,
+  );
+  return Math.round((amountCents * commission) / 100);
 }
 
 function asCommissionList(
@@ -206,7 +216,11 @@ export async function correctSaleCommission(input: {
     return { ...base, action: "unpriced" };
   }
 
-  const targetEarnings = targetEarningsCents(commission.amount, decision.tier);
+  const targetEarnings = targetEarningsCents(
+    commission.amount,
+    decision.tier,
+    commission.createdAt,
+  );
   const decided: CorrectionRow = {
     ...base,
     tier: decision.tier,

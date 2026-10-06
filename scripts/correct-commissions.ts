@@ -1,5 +1,5 @@
 /**
- * Move every approved partner into the 20% home group, then correct unpaid
+ * Move every approved partner into the 25% home group, then correct unpaid
  * Dub sale commissions from the last 90 days. Prints paid rows that are wrong
  * and leaves them unchanged.
  *
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
 
   const groups = await moveAllPartnersToHomeGroup();
   console.log(
-    `Partners moved to the 20% group: ${groups.moved}. Already there: ${groups.unchanged}.`,
+    `Partners moved to the 25% group: ${groups.moved}. Already there: ${groups.unchanged}.`,
   );
 
   const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);

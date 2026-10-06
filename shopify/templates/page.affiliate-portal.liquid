@@ -532,6 +532,7 @@
       var label = card.querySelector(".affiliate-portal__toggle-label");
       var previous = !active;
 
+      input.disabled = true;
       card.classList.toggle("is-inactive", !active);
       label.textContent = active ? "Active" : "Inactive";
 
@@ -552,6 +553,9 @@
           card.classList.toggle("is-inactive", !previous);
           label.textContent = previous ? "Active" : "Inactive";
           setStatus(card, "Could not update code", "error");
+        })
+        .finally(function () {
+          input.disabled = false;
         });
     }
 

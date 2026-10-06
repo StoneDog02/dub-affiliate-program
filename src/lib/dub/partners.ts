@@ -134,7 +134,7 @@ export async function createPartnerLink(
 }
 
 /**
- * Put a partner in the single 20% home group.
+ * Put a partner in the single 25% home group.
  * Uses partner upsert with groupId. Does not rewrite commissions already recorded.
  */
 export async function movePartnerToHomeGroup(partner: DubPartner): Promise<boolean> {

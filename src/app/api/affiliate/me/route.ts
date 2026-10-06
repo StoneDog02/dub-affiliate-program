@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { metadataIncludesCode } from "@/lib/affiliate/metadata";
 import { findPartnerByToken } from "@/lib/dub/partners";
 import { env } from "@/lib/env";
 import { isDiscountActive } from "@/lib/shopify/client";

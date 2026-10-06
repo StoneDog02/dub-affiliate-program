@@ -24,27 +24,36 @@ Shopify customer created (webhook)
   → If email matches a Dub affiliate, tag customer + store portal token
 
 Shopify order paid (webhook)
-  → Parse tier from code suffix (e.g. SH10, STONEY10)
-  → Move partner to correct Dub group BEFORE commission fires
+  → Find the Dub sale for the Shopify order
+  → Use a discount code owned by the paid partner, or the sale's Dub link key, to select a tier
+  → Correct the sale's earnings to the commission rate for that tier
 
 CareValidate payment completed (webhook)
   → Read affiliate promo from payload (case.referralCode)
-  → Move partner to correct Dub tier group
-  → Record sale commission in Dub (commissions.create)
+  → Record a sale in Dub against the partner link for that promo (commissions.create)
+  → Correct the sale's earnings to the commission rate for that code
 
 Affiliate portal (Shopify page, login required)
   → Token read from customer metafield (custom.affiliate_portal_token)
-  → GET /api/affiliate/me?token=...
-  → POST /api/affiliate/toggle-code
+  → GET /api/affiliate/me?token=... reads each Shopify code's active status
+  → POST /api/affiliate/toggle-code activates or deactivates one Shopify code
 ```
+
+Each affiliate receives all three codes and links. Affiliates stay in the default flexible-offers group in Dub; they do not move between groups when customers use different codes. The group reward supplies Dub's initial commission, and the Shopify/CareValidate sale correction sets earnings from the code or attributed link. The daily reconciliation job retries Shopify and CareValidate sales from the preceding 48 hours.
+
+Deactivating a code in the affiliate portal deactivates the Shopify discount and expires its matching Dub tracking link, preventing new coupon use and new clicks through that link. Reactivating the code restores both. If either service fails, the API attempts to restore the prior state and reports an error. Existing Dub attribution from earlier clicks may still produce commissions. A matching CareValidate promo code must still be toggled manually in CareValidate admin. Codes that were already inactive before this change need a one-time link sync.
+
+After deploying the coordinated toggle API, run `npx tsx scripts/sync-code-links.ts` to preview any existing link/code mismatches. If the preview looks correct, run `npx tsx scripts/sync-code-links.ts --apply` to align them. This script only changes Dub link expiration; it does not change Shopify discount status.
 
 ### Tier mapping
 
-| Code pattern | Customer discount | Affiliate commission | Dub group env |
-|---|---|---|---|
-| `10` suffix | 10% | 20% | `DUB_GROUP_ID_TIER_A` |
-| `15` suffix | 15% | 15% | `DUB_GROUP_ID_TIER_B` |
-| `20` suffix | 20% | 10% | `DUB_GROUP_ID_TIER_C` |
+| Code pattern | Customer discount | Affiliate commission |
+|---|---|---|
+| `10` suffix | 10% | 25% |
+| `15` suffix | 15% | 20% |
+| `20` suffix | 20% | 15% |
+
+Each discount and commission pair totals 35 percentage points. These commission rates apply to Dub sales created on or after October 6, 2026, 19:47:29 UTC; earlier sales keep the prior 20% / 15% / 10% commission rates during reconciliation. `DUB_GROUP_ID_TIER_A` identifies the home group for new affiliates. The B and C group IDs remain in the tier configuration but are not used by the normal sale flow.
 
 ## Environment variables
 
@@ -63,9 +72,9 @@ cp .env.example .env.local
 | `DUB_API_KEY` | Dub workspace API key |
 | `DUB_PROGRAM_ID` | Dub partner program ID |
 | `DUB_WEBHOOK_SECRET` | Dub webhook signing secret |
-| `DUB_GROUP_ID_TIER_A` | Group for 20% commission |
-| `DUB_GROUP_ID_TIER_B` | Group for 15% commission |
-| `DUB_GROUP_ID_TIER_C` | Group for 10% commission |
+| `DUB_GROUP_ID_TIER_A` | Home group for all affiliates; 25% default sale reward |
+| `DUB_GROUP_ID_TIER_B` | Legacy Tier B group ID; not used by the normal sale flow |
+| `DUB_GROUP_ID_TIER_C` | Legacy Tier C group ID; not used by the normal sale flow |
 | `KLAVIYO_API_KEY` | Klaviyo private API key |
 | `NEXT_PUBLIC_PORTAL_BASE_URL` | `https://bodyiq.com` |
 | `NEXT_PUBLIC_API_BASE_URL` | Deployed Next.js URL (for Shopify portal JS) |
@@ -98,11 +107,11 @@ If `CAREVALIDATE_WEBHOOK_SECRET` is set, CareValidate must send the same value i
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/webhooks/dub-partner-approved` | Provision codes + links on Dub `partner.enrolled` |
-| `POST` | `/api/webhooks/shopify-order-complete` | Move partner to tier group on order |
+| `POST` | `/api/webhooks/shopify-order-complete` | Correct Dub sale earnings from the affiliate code or link |
 | `POST` | `/api/webhooks/shopify-customer-created` | Link new Shopify customer to Dub affiliate |
 | `POST` | `/api/webhooks/carevalidate` | Record Dub commission on CV `PAYMENT_COMPLETED` |
 | `GET` | `/api/affiliate/me?token=` | Portal data + Shopify code status |
-| `POST` | `/api/affiliate/toggle-code` | Enable/disable a discount code |
+| `POST` | `/api/affiliate/toggle-code` | Activate/deactivate a Shopify discount code and its Dub tracking link |
 
 ## Shopify setup
 
